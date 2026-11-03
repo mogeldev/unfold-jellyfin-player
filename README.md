@@ -1,34 +1,34 @@
 # Unfold – Jellyfin Player
 
-Schlanker Desktop-Player für [Jellyfin](https://jellyfin.org). Er zeigt nur die Bibliothek, abgespielt wird mit eingebettetem mpv (libmpv). Kein eigener Video-Code, kein Transcoding.
+A lean desktop player for [Jellyfin](https://jellyfin.org). It only shows your library; playback is done by an embedded mpv (libmpv). No video code of its own, no transcoding.
 
-- 5 Spalten: Bibliotheken → Inhalt → Details → Episoden → Spuren/Abspielen
-- Suche (`/`), Buchstabenleiste A–Z, Tastatursteuerung
+- 5 columns: libraries → content → details → episodes → tracks / play
+- Search (`/`), A–Z letter bar, full keyboard control
 - Themes: terminal, nord, blueprint
-- Sprachen: Englisch, Deutsch
-- Gesehen-Status und Fortschritt werden zum Server zurückgemeldet, Wiedergabe setzt fort
-- Buch-Animationen beim Öffnen von Spalten und beim Start/Ende der Wiedergabe
+- Languages: English, German
+- Watched state and progress are reported back to the server; playback resumes where you left off
+- Book-style page-turn animations when opening columns and when starting or leaving playback
 
-Windows ist die Hauptplattform (WebView2, mpv im Fenster). Linux läuft mit eigenem mpv-Fenster, ist aber ungetestet.
+Windows is the main platform (WebView2, mpv embedded in the window). Linux runs with a separate mpv window but is untested.
 
-## Starten
+## Run
 
 ```
 pip install -r requirements.txt
-python tools/fetch_libmpv.py    # nur Windows, braucht 7-Zip
-python main.py                  # JF_DEBUG=1 für Dev-Tools
+python tools/fetch_libmpv.py    # Windows only, needs 7-Zip
+python main.py                  # JF_DEBUG=1 for dev tools
 ```
 
-Python 3.10+. Unter Linux wird `libmpv2` bzw. `mpv-libs` aus dem Paketmanager gebraucht.
+Python 3.10+. On Linux you need `libmpv2` / `mpv-libs` from your package manager.
 
-## Installer bauen (Windows)
+## Build the installer (Windows)
 
 ```
 winget install JRSoftware.InnoSetup
-.\tools\make_installer.ps1      # dist\Unfold\Unfold.exe + installer\out\Unfold-Setup-<Version>.exe
+.\tools\make_installer.ps1      # dist\Unfold\Unfold.exe + installer\out\Unfold-Setup-<version>.exe
 ```
 
-## Mehr
+## More
 
-Aufbau, Server-Aufrufe und bekannte Einschränkungen: [ARCHITECTURE.md](ARCHITECTURE.md).
-Das Passwort wird nie gespeichert, nur das Token (Keyring, sonst Config-Datei).
+Design, server calls and known limitations: [ARCHITECTURE.md](ARCHITECTURE.md) (in German).
+The password is never stored, only the token (keyring, otherwise the config file).
