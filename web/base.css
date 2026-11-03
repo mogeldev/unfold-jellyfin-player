@@ -1,0 +1,81 @@
+/* Struktur für alle Designs; Designs setzen nur Variablen + Extras */
+:root{--w:11rem 17rem 1.2fr 1.1fr 1fr;--bw:1px;--pad:12px;--ip:.6em;--fs:14px;--font:system-ui,sans-serif;--hov:rgba(128,128,128,.12);--radius:0}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:var(--fs)/1.4 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
+/* width:max-content: Spalten bekommen ihre natürliche Breite, auch wenn das Fenster (noch) schmaler ist; das Fenster wächst dann nach */
+#app{display:grid;grid-template-columns:var(--w);height:100vh;width:max-content;min-width:100%}
+#app{position:relative}
+/* Seitenumschlag beim Öffnen/Verlassen von mpv (Aufbau in app.js: pageOut) */
+.flip{position:fixed;inset:0;z-index:50;background:var(--bg);perspective:2600px;overflow:hidden}
+.flip>*{position:absolute;top:0;bottom:0;width:50%}
+.fl{left:0}
+.fr{left:50%;background:var(--bg)}
+.cast{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 55%)}
+.leaf{left:50%;transform-origin:0 50%;transform-style:preserve-3d}
+.leaf>*{position:absolute;inset:0;backface-visibility:hidden}
+.leaf .back{transform:rotateY(180deg)}
+.shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.3),rgba(0,0,0,.08) 60%,rgba(0,0,0,.18))}
+.leaf .front .shade{opacity:0}
+.leaf .back .shade{background:linear-gradient(270deg,rgba(0,0,0,.18),transparent 60%)}
+.rz{position:absolute;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5}
+.rz:hover,.rz.drag{background:var(--dim);opacity:.45}
+body.dragging{user-select:none;cursor:col-resize}
+.sp{height:.8em}
+.lst{display:contents}
+/* Buchstabenleiste 0-9, A–Z: bleibt beim Scrollen oben stehen */
+.az{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:1px 2px;padding:.3em var(--ip) .4em;margin-bottom:.2em;background:var(--colbg,var(--bg))}
+.az-k{cursor:pointer;color:var(--fg);font-size:.78em;padding:.1em .38em;border-radius:var(--radius);user-select:none}
+.az-k:hover{background:var(--hov)}
+.az-k.on{background:var(--sel-bg);color:var(--sel-fg)}
+.az-k.off{color:var(--dim);opacity:.35;pointer-events:none}
+.sh{padding-bottom:0}
+.q{width:100%;font:inherit;text-transform:none;letter-spacing:normal;color:var(--fg);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:.25em 0;outline:none}
+.q:focus{border-bottom-color:var(--fg)}
+.q::placeholder{color:var(--dim)}
+/* Neue Spalte: Inhalt schlägt wie eine Buchseite um die linke Kante auf (mehrere Spalten nacheinander) */
+.col.unfolding{overflow:hidden;perspective:1400px;perspective-origin:0 50%}
+.col.unfolding>*{transform-origin:0 50%;backface-visibility:hidden;animation:page-turn .75s cubic-bezier(.25,.8,.25,1) calc(var(--i,0) * .15s) both}
+@keyframes page-turn{0%{transform:rotateY(-100deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.col.unfolding>*{animation:none}}
+.d .meta{white-space:normal}
+.col{overflow:auto;overflow-x:hidden;padding:var(--pad);border-right:var(--bw) solid var(--line);min-width:110px;display:flex;flex-direction:column;gap:1px;background:var(--colbg,transparent)}
+/* Scrollbalken im Theme (nur ::-webkit-scrollbar, denn scrollbar-width/-color würden es in Chromium überschreiben) */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:var(--radius);opacity:.6}
+::-webkit-scrollbar-thumb:hover{background:var(--fg)}
+::-webkit-scrollbar-button{display:none}
+.col:last-child{border-right:0}
+.h{color:var(--dim);font-size:.78em;text-transform:var(--tt,uppercase);letter-spacing:.08em;padding:.4em var(--ip);margin-bottom:.4em}
+.letter{color:var(--dim);font-size:.78em;padding:.9em var(--ip) .2em}
+.item{display:flex;justify-content:space-between;gap:.8em;padding:.45em var(--ip);cursor:pointer;border-radius:var(--radius);color:var(--fg);text-decoration:none;user-select:none}
+.item:hover{background:var(--hov)}
+.item.on{background:var(--sel-bg);color:var(--sel-fg)}
+.mark,.meta{color:var(--dim);font-size:.85em;white-space:nowrap}
+.item.on .mark,.item.on .meta{color:inherit;opacity:.7}
+.col.focus>.h:first-child{color:var(--fg)}
+.item.seen:not(.on){opacity:.45}
+.foot{margin-top:auto;padding-top:1em}
+.d{padding:0 var(--ip)}
+.poster{aspect-ratio:2/3;width:100%;max-width:200px;background:linear-gradient(160deg,hsl(var(--hue) 40% 45%),hsl(calc(var(--hue) + 40) 40% 20%));border-radius:var(--radius);margin-bottom:1em}
+h1{font-size:1.5em;font-weight:var(--hw,600);line-height:1.15;margin-bottom:.3em}
+.d p{white-space:pre-line;overflow-wrap:anywhere;margin-top:.8em;color:var(--fg);opacity:.8;max-width:42ch}
+.poster{background-size:cover;background-position:center}
+.dlg{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bg) 85%,transparent)}
+.dlg form{width:min(380px,90vw);display:flex;flex-direction:column;gap:.8em;padding:1.4em;background:var(--bg);border:var(--bw) solid var(--line);border-radius:var(--radius)}
+.dlg label{display:flex;flex-direction:column;gap:.3em;color:var(--dim);font-size:.85em}
+.dlg input{font:inherit;padding:.5em;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:var(--radius)}
+.dlg .inline{display:flex;gap:.6em}
+.dlg .inline label{min-width:0}
+.dlg select{font:inherit;padding:.5em;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+.dlg .themes{display:flex;flex-wrap:wrap;gap:.4em}
+.dlg .themes .item{padding:.3em .6em;border:1px solid var(--line)}
+.dlg .row{display:flex;gap:.6em}
+.dlg .alt{background:transparent;color:var(--fg);border-color:var(--line)}
+.err{color:#e5484d;font-size:.85em}
+.play{width:100%;padding:.8em;font:inherit;font-weight:600;cursor:pointer;background:var(--acc);color:var(--acc-fg);border:var(--bw) solid var(--acc);border-radius:var(--radius)}
+.play:hover{filter:brightness(1.1)}
+.note{color:var(--dim);font-size:.78em;margin-top:.6em;padding:0 var(--ip)}
+.toast{position:fixed;left:50%;bottom:16px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;background:var(--fg);color:var(--bg);padding:.6em 1em;font:12px/1.3 Consolas,monospace;max-width:90vw;border-radius:var(--radius)}
+.toast.show{opacity:1;transform:translate(-50%,0)}

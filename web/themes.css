@@ -1,0 +1,23 @@
+/* Themes: per <html data-theme="…"> umschaltbar. Nur Variablen + Extras. */
+
+/* terminal */
+[data-theme=terminal]{--bg:#0b0f0b;--fg:#b6f2b6;--dim:#4c7a4c;--line:#1f3a1f;--sel-bg:#b6f2b6;--sel-fg:#0b0f0b;--acc:#0b0f0b;--acc-fg:#b6f2b6;--font:Consolas,"Courier New",monospace;--fs:13px;--hw:400;--hov:#14221a}
+[data-theme=terminal] .h::before{content:"> "}
+[data-theme=terminal] .play{border:1px solid #b6f2b6}
+[data-theme=terminal] .play:hover{background:#b6f2b6;color:#0b0f0b}
+[data-theme=terminal]{--ip:1.1em}
+[data-theme=terminal] .item{position:relative}
+[data-theme=terminal] .item.on::before{content:"▸";position:absolute;left:.35em}
+
+/* nord */
+[data-theme=nord]{--bg:#2e3440;--fg:#eceff4;--dim:#7b88a1;--line:#3b4252;--sel-bg:#434c5e;--sel-fg:#88c0d0;--acc:#88c0d0;--acc-fg:#2e3440;--radius:6px;--pad:10px;--hov:#3b4252}
+[data-theme=nord] .col:nth-child(odd){background:#2b303b}
+[data-theme=nord] .poster{box-shadow:0 8px 24px #0006}
+
+/* blueprint */
+[data-theme=blueprint]{--bg:#0d3b66;--fg:#e8f1fa;--dim:#8fb3d9;--line:#e8f1fa66;--sel-bg:transparent;--sel-fg:#fff;--acc:transparent;--acc-fg:#fff;--font:"Courier New",monospace;--fs:13px;--hw:400;--hov:#ffffff14}
+[data-theme=blueprint] body{background-image:linear-gradient(#ffffff12 1px,transparent 1px),linear-gradient(90deg,#ffffff12 1px,transparent 1px);background-size:24px 24px}
+[data-theme=blueprint] .col{border-right-style:dashed}
+[data-theme=blueprint] .item.on{outline:1px dashed #fff;outline-offset:-1px}
+[data-theme=blueprint] .play{border:1px dashed #fff}
+[data-theme=blueprint] .play:hover{background:#fff;color:#0d3b66}

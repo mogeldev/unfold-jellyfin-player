@@ -1,0 +1,39 @@
+"""Prüft Login, Bibliotheken, Items, Details und PlaybackInfo gegen einen echten Server (ohne mpv).
+Aufruf: python tools/smoke_test.py http://192.168.0.4:8096 test   (Passwort wird abgefragt)"""
+import getpass
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from jellyfin import Jellyfin, streams  # noqa: E402
+
+
+def main():
+    server, user = sys.argv[1], sys.argv[2]
+    jf = Jellyfin(server, "smoke-test")
+    jf.login(user, getpass.getpass("Passwort: "))
+    print("Login OK, User", jf.user_id)
+    libs = jf.libraries()
+    print("Bibliotheken:", [(v["Name"], v.get("CollectionType")) for v in libs])
+    for v in libs:
+        items = jf.items(v["Id"])
+        print(f"- {v['Name']}: {len(items)} Items", [i["Name"] for i in items[:3]])
+        if not items:
+            continue
+        first = items[0]
+        d = jf.detail(first["Id"])
+        if d["Type"] == "Series":
+            eps = jf.episodes(first["Id"])
+            print("  Serie", d["Name"], "Episoden:", len(eps))
+            d = eps[0] if eps else d
+        st, ms = streams(d)
+        print("  Spuren:", st)
+        if d["Type"] != "Series":
+            info = jf.playback_info(d["Id"])
+            print("  PlaybackInfo: PlaySessionId", bool(info.get("PlaySessionId")), "| Stream:", jf.stream_url(d["Id"], ms, info["PlaySessionId"]).split("api_key")[0] + "api_key=…")
+    jf.logout()
+    print("Logout OK")
+
+
+if __name__ == "__main__":
+    main()

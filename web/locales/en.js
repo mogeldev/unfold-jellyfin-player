@@ -1,0 +1,21 @@
+// English (also the fallback for missing keys in other languages)
+(window.LOCALES ||= {}).en = {
+  _name: 'English',
+  libraries: 'Libraries', theme: 'Theme', account: 'Account', settings: 'Settings', language: 'Language',
+  episodes: 'Episodes', season: 'Season {n}', seasons_one: '{n} season', seasons_other: '{n} seasons',
+  search: 'Search', search_placeholder: 'Search…', no_results: 'No results',
+  series: 'Series', watched: '✓ watched', min: 'min',
+  video: 'Video', audio: 'Audio', subtitles: 'Subtitles', subs_off: 'Off',
+  play: '▶ Play', play_note: 'Plays in mpv. All tracks stay selectable during playback; starts with the selection above.',
+  back: '←  Back',
+  protocol: 'Protocol', server: 'Server', port: 'Port', user: 'User', password: 'Password',
+  sign_in: 'Sign in', sign_out: 'Sign out', close: 'Close', cancel: 'Cancel', save: 'Save', ok: 'OK', saved: 'Saved',
+  playback: 'Playback', play_embedded: 'In app window', play_external: 'Separate window', mpv_opts: 'mpv options, e.g. hwdec=auto',
+  mpv_started: 'mpv started', error: 'Error: {msg}',
+  err_no_server: 'Server address is missing',
+  err_auth: 'Sign-in failed or session expired',
+  err_server_error: 'Server error {code}',
+  err_unreachable: 'Server unreachable: {reason}',
+  err_not_logged_in: 'Not signed in',
+  err_libmpv: 'libmpv not found. Windows: run python tools/fetch_libmpv.py; Linux: install libmpv2 / mpv-libs.',
+};

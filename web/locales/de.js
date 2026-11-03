@@ -1,0 +1,21 @@
+// Deutsch
+(window.LOCALES ||= {}).de = {
+  _name: 'Deutsch',
+  libraries: 'Bibliotheken', theme: 'Design', account: 'Konto', settings: 'Einstellungen', language: 'Sprache',
+  episodes: 'Episoden', season: 'Staffel {n}', seasons_one: '{n} Staffel', seasons_other: '{n} Staffeln',
+  search: 'Suche', search_placeholder: 'Suchen …', no_results: 'Keine Treffer',
+  series: 'Serie', watched: '✓ gesehen', min: 'min',
+  video: 'Video', audio: 'Audio', subtitles: 'Untertitel', subs_off: 'Aus',
+  play: '▶ Abspielen', play_note: 'Spielt mit mpv ab. Alle Spuren sind währenddessen wählbar, Start mit obiger Auswahl.',
+  back: '←  Zurück',
+  protocol: 'Protokoll', server: 'Server', port: 'Port', user: 'Benutzer', password: 'Passwort',
+  sign_in: 'Anmelden', sign_out: 'Abmelden', close: 'Schließen', cancel: 'Abbrechen', save: 'Speichern', ok: 'OK', saved: 'Gespeichert',
+  playback: 'Video abspielen', play_embedded: 'im App-Fenster', play_external: 'eigenes Fenster', mpv_opts: 'mpv-Optionen, z. B. hwdec=auto',
+  mpv_started: 'mpv gestartet', error: 'Fehler: {msg}',
+  err_no_server: 'Server-Adresse fehlt',
+  err_auth: 'Anmeldung fehlgeschlagen oder Sitzung abgelaufen',
+  err_server_error: 'Server-Fehler {code}',
+  err_unreachable: 'Server nicht erreichbar: {reason}',
+  err_not_logged_in: 'Nicht angemeldet',
+  err_libmpv: 'libmpv nicht gefunden. Windows: python tools/fetch_libmpv.py ausführen; Linux: libmpv2 bzw. mpv-libs installieren.',
+};
