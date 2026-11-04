@@ -102,3 +102,9 @@ h1{font-size:1.5em;font-weight:var(--hw,600);line-height:1.15;margin-bottom:.3em
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .dlg .accs{display:flex;flex-direction:column}
 .dlg .accs .item{padding:.4em .6em}
+/* Help: keyboard control, key on the left, action on the right */
+.dlg form{max-height:92vh;overflow:auto}
+.dlg .kh{color:var(--dim);font-size:.78em;text-transform:var(--tt,uppercase);letter-spacing:.08em;margin-top:.4em}
+.dlg .kr{display:grid;grid-template-columns:5.5em 1fr;gap:.8em;align-items:baseline}
+.dlg kbd{font:inherit;color:var(--fg);white-space:nowrap}
+.dlg .kr span{color:var(--fg);opacity:.75}

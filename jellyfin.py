@@ -7,7 +7,7 @@ import urllib.request
 from errors import AppError as JellyfinError  # errors carry a code, the frontend translates it
 
 TICKS = 10_000_000  # Jellyfin ticks per second
-CLIENT, VERSION = "Unfold", "0.2"
+CLIENT, VERSION = "Unfold", "0.3"
 
 
 def normalize(server: str) -> str:

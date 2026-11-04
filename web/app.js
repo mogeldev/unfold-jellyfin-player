@@ -71,7 +71,8 @@
     return out;
   };
   // langs: language choice in the dialog; a click closes it with { __lang }, the caller rebuilds it
-  function form(title, fields, { submit = t('ok'), cancel = null, note = '', error = '', themes = false, langs = false, accounts = null, out = '' } = {}) {
+  // keys: [[heading, [[key, text], …]], …] (help); such a dialog also closes with Esc
+  function form(title, fields, { submit = t('ok'), cancel = null, note = '', error = '', themes = false, langs = false, accounts = null, out = '', keys = null } = {}) {
     return new Promise(res => {
       const d = document.createElement('div');
       d.className = 'dlg';
@@ -80,6 +81,7 @@
         ${themes ? `<div class="themes">${THEMES.map(n => `<a class="item${n === theme ? ' on' : ''}" data-th="${n}">${n}</a>`).join('')}</div>` : ''}
         ${langs ? `<div class="themes">${I18N.languages().map(l => `<a class="item${l.code === I18N.lang ? ' on' : ''}" data-lang="${l.code}">${esc(l.name)}</a>`).join('')}</div>` : ''}
         ${accounts ? `<div class="accs">${accounts.list.map((n, i) => `<a class="item${i === accounts.on ? ' on' : ''}" data-acc="${i}">${esc(n)}</a>`).join('')}</div>` : ''}
+        ${keys ? keys.map(([h, rows]) => `<div class="kh">${esc(h)}</div>` + rows.map(([k, s]) => `<div class="kr"><kbd>${esc(k)}</kbd><span>${esc(s)}</span></div>`).join('')).join('') : ''}
         ${error ? `<div class="err">${esc(error)}</div>` : ''}
         <div class="row"><button class="play" type="submit">${esc(submit)}</button>${out ? `<button class="play alt" type="button" data-out>${esc(out)}</button>` : ''}${cancel ? `<button class="play alt" type="button" data-x>${esc(cancel)}</button>` : ''}</div></form>`;
       document.body.append(d);
@@ -96,8 +98,15 @@
       d.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => done({ __acc: +a.dataset.acc })));
       d.querySelector('[data-out]')?.addEventListener('click', () => done({ __out: true }));
       d.querySelector('[data-x]')?.addEventListener('click', () => done(null));
+      if (keys) d.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); done(null); } });
     });
   }
+  // Help: keyboard control in the library and during playback (mpv default keys + our own)
+  const help = () => form(t('help'), [], { submit: t('close'), keys: [
+    [t('help_library'), [['← →', t('k_cols')], ['↑ ↓', t('k_sel')], ['A–Z', t('k_letter')], ['Enter', t('k_play')],
+      ['/', t('k_search')], ['Esc', t('k_search_close')], ['F11', t('k_fs')], ['?', t('k_help')]]],
+    [t('help_playback'), [['Esc', t('k_back')], [t('k_space'), t('k_pause')], ['← →', t('k_seek')], ['↑ ↓', t('k_seek_long')],
+      ['j', t('k_subs')], ['#', t('k_audio')], ['f', t('k_fs')]]]] });
   // Switch language and remember it in the backend
   async function setLang(code) {
     I18N.set(code);
@@ -277,7 +286,8 @@
       `<div class="foot"><a class="item sw${fsOn ? ' swon' : ''}" data-fs title="F11"><span>${t('fullscreen')}</span><i class="tg"></i></a>
       <div class="item row"><span>${t('theme')}</span><span class="dd"><select class="sel" data-theme-sel>${THEMES.map(n => `<option${n === theme ? ' selected' : ''}>${n}</option>`).join('')}</select></span></div>
       <div class="item row"><span>${t('scale')}</span><span class="stp"><a class="${scale <= 50 ? 'off' : ''}" data-sc="-10">−</a><span>${scale}%</span><a class="${scale >= 200 ? 'off' : ''}" data-sc="10">+</a></span></div>
-      <a class="item" data-act="account">${t('account')}</a><a class="item" data-act="settings">${t('settings')}</a></div>`;
+      <a class="item" data-act="account">${t('account')}</a><a class="item" data-act="settings">${t('settings')}</a>
+      <a class="item" data-act="help"><span>${t('help')}</span><span class="mark">?</span></a></div>`;
     const c2 = (searchOn
       ? `<div class="h sh"><input class="q" size="14" placeholder="${esc(t('search_placeholder'))}" value="${esc(query)}" spellcheck="false" autocomplete="off"></div>`
       : `<div class="h">${esc(libs[lib]?.name)} · ${letter ? shownCount() + '/' : ''}${items.length}</div>`) + `<div class="lst">${listHtml()}</div>`;
@@ -346,6 +356,7 @@
     const attr = { c1: 'lib', c2: 'item', c4: 'ep' }[fcol];
     const k = e.key;
     if (k === '/') { e.preventDefault(); openSearch(); return; }
+    if (k === '?') { e.preventDefault(); help(); return; }
     if (k === 'ArrowLeft' || k === 'ArrowRight') {
       e.preventDefault();
       fcol = cols[Math.max(0, Math.min(cols.length - 1, cols.indexOf(fcol) + (k === 'ArrowRight' ? 1 : -1)))];
@@ -456,6 +467,7 @@
     else if ((x = q('st'))) { const [k, i] = x.dataset.st.split('.'); sel[k] = +i; }
     else if ((x = q('act'))) {
       if (x.dataset.act === 'search') { openSearch(); return; }
+      if (x.dataset.act === 'help') { help(); return; }
       const st = await call('state');
       if (x.dataset.act === 'account') {
         const v = await form(t('account'), [], { submit: t('add_account'), cancel: t('close'), out: t('sign_out'),

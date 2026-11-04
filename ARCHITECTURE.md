@@ -14,7 +14,7 @@ Principle: **the player only shows the library. mpv does the playing.** No video
 
 At start only column 1 is shown; column 2 appears after clicking a library, the others after clicking an entry. Widths adapt to the content automatically (capped); dragging sets a fixed width, double-clicking the handle makes it automatic again. The window width follows the visible columns (`chrome.fit_width`), the height stays as it is. Themes: terminal, nord, blueprint.
 
-Keyboard: ←→ switch column, ↑↓ select, a letter jumps within the list (column 2), Enter = play, F11 = fullscreen. `/` opens the search (all libraries, movies and series, hits by relevance); Enter/↓ opens the first result, Esc closes.
+Keyboard: ←→ switch column, ↑↓ select, a letter jumps within the list (column 2), Enter = play, F11 = fullscreen. `/` opens the search (all libraries, movies and series, hits by relevance); Enter/↓ opens the first result, Esc closes. `?` (or "Help" at the bottom of column 1) shows all keys, for the library and during playback.
 
 Letter bar (0-9, A–Z, … if needed) at the top of column 2: a click filters the list to that initial (Ä counts as A), clicking again clears the filter. Groups without entries are dimmed; the bar is hidden while searching.
 
