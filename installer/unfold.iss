@@ -1,4 +1,4 @@
-; Inno-Setup-Skript. Voraussetzung: dist\Unfold (tools\build.ps1). Bauen: tools\make_installer.ps1
+; Inno Setup script. Needs dist\Unfold (tools\build.ps1). Build with tools\make_installer.ps1
 #define AppName "Unfold – Jellyfin Player"
 #define AppVersion "0.3.0"
 
@@ -25,6 +25,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 [Languages]
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "french"; MessagesFile: "compiler:Languages\French.isl"
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

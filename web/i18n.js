@@ -20,7 +20,7 @@
     },
     get lang() { return lang; },
     set(code) { lang = pick(code); document.documentElement.lang = lang; return lang; },
-    detect() { return pick(navigator.language); },          // Systemsprache, sonst Englisch
+    detect() { return pick(navigator.language); },          // system language, otherwise English
     languages() { return Object.keys(L).map(code => ({ code, name: L[code]._name || code })); },
   };
 })();
