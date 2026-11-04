@@ -1,4 +1,4 @@
-// Frontend: 5 Spalten. Daten kommen über api (pywebview → main.py, oder MOCK im Browser).
+// Frontend: 5 columns. Data comes through api (pywebview → main.py, or MOCK in the browser).
 (async () => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hue = s => [...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
@@ -10,7 +10,7 @@
   });
   const t = (k, v) => I18N.t(k, v);
   const APP = 'Unfold – Jellyfin Player';
-  // Fehler vom Backend kommen als Code (+ Parameter) und werden hier übersetzt
+  // Backend errors arrive as a code (+ params) and are translated here
   const call = async (n, ...a) => {
     const r = await raw[n](...a);
     if (!r.ok) throw new Error(r.code ? t('err_' + r.code, r.params) : r.error);
@@ -34,8 +34,20 @@
   if (!THEMES.includes(theme)) theme = THEMES[0];
   document.documentElement.dataset.theme = theme;
 
-  // ---- Dialog (Login, Konto, Einstellungen) ----
-  // Fensterrahmen (Titelleiste) in der Farbe des Themes, damit das Fenster mit der Oberfläche verschmilzt
+  // Text size in %, 50–200 in steps of 10; acts via --sc on font, spacing and column caps (CAP)
+  let fsOn = false; // fullscreen switch (library); the window itself cannot be queried
+  let scale = 100;
+  try { scale = +localStorage.getItem('scale') || scale; } catch (_) {}
+  scale = Math.min(200, Math.max(50, Math.round(scale / 10) * 10));
+  function setScale(p) {
+    scale = Math.min(200, Math.max(50, p));
+    document.documentElement.style.setProperty('--sc', scale / 100);
+    try { localStorage.setItem('scale', scale); } catch (_) {}
+  }
+  setScale(scale);
+
+  // ---- Dialog (login, account, settings) ----
+  // Window frame (title bar) in the theme colour so the window blends into the UI
   const chrome = () => { if (raw.set_chrome) raw.set_chrome(getComputedStyle(document.body).backgroundColor); };
   function setTheme(n) {
     theme = n; document.documentElement.dataset.theme = n;
@@ -46,7 +58,7 @@
   const fieldHtml = f => `<label${f.flex ? ` style="flex:${f.flex}"` : ''}>${esc(f.label)}` + (f.type === 'select'
     ? `<select name="${f.k}">${f.options.map(o => `<option${o === f.value ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`
     : `<input name="${f.k}" type="${f.type || 'text'}" value="${esc(f.value || '')}" autocomplete="off">`) + `</label>`;
-  // Felder mit gleichem `row` stehen nebeneinander
+  // Fields with the same `row` sit side by side
   const fieldsHtml = fields => {
     let out = '', i = 0;
     while (i < fields.length) {
@@ -58,8 +70,8 @@
     }
     return out;
   };
-  // langs: Sprachwahl im Dialog; ein Klick schließt ihn mit { __lang }, der Aufrufer baut ihn neu auf
-  function form(title, fields, { submit = t('ok'), cancel = null, note = '', error = '', themes = false, langs = false } = {}) {
+  // langs: language choice in the dialog; a click closes it with { __lang }, the caller rebuilds it
+  function form(title, fields, { submit = t('ok'), cancel = null, note = '', error = '', themes = false, langs = false, accounts = null, out = '' } = {}) {
     return new Promise(res => {
       const d = document.createElement('div');
       d.className = 'dlg';
@@ -67,8 +79,9 @@
         ${fieldsHtml(fields)}
         ${themes ? `<div class="themes">${THEMES.map(n => `<a class="item${n === theme ? ' on' : ''}" data-th="${n}">${n}</a>`).join('')}</div>` : ''}
         ${langs ? `<div class="themes">${I18N.languages().map(l => `<a class="item${l.code === I18N.lang ? ' on' : ''}" data-lang="${l.code}">${esc(l.name)}</a>`).join('')}</div>` : ''}
+        ${accounts ? `<div class="accs">${accounts.list.map((n, i) => `<a class="item${i === accounts.on ? ' on' : ''}" data-acc="${i}">${esc(n)}</a>`).join('')}</div>` : ''}
         ${error ? `<div class="err">${esc(error)}</div>` : ''}
-        <div class="row"><button class="play" type="submit">${esc(submit)}</button>${cancel ? `<button class="play alt" type="button" data-x>${esc(cancel)}</button>` : ''}</div></form>`;
+        <div class="row"><button class="play" type="submit">${esc(submit)}</button>${out ? `<button class="play alt" type="button" data-out>${esc(out)}</button>` : ''}${cancel ? `<button class="play alt" type="button" data-x>${esc(cancel)}</button>` : ''}</div></form>`;
       document.body.append(d);
       const f = d.querySelector('form');
       (f.querySelector('input') || f.querySelector('button')).focus();
@@ -80,15 +93,18 @@
       d.querySelectorAll('[data-lang]').forEach(a => a.addEventListener('click', () =>
         done({ ...Object.fromEntries(new FormData(f)), __lang: a.dataset.lang })));
       f.addEventListener('submit', e => { e.preventDefault(); done(Object.fromEntries(new FormData(f))); });
+      d.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => done({ __acc: +a.dataset.acc })));
+      d.querySelector('[data-out]')?.addEventListener('click', () => done({ __out: true }));
       d.querySelector('[data-x]')?.addEventListener('click', () => done(null));
     });
   }
-  // Sprache wechseln und im Backend merken
+  // Switch language and remember it in the backend
   async function setLang(code) {
     I18N.set(code);
     try { await call('set_lang', I18N.lang); } catch (_) {}
   }
-  async function login(st = {}) {
+  // canCancel (add account): cancelling returns false
+  async function login(st = {}, canCancel = false) {
     let error = '';
     let p = { proto: 'http', host: '', port: '8096', user: st.user || '' };
     try {
@@ -101,20 +117,21 @@
         { k: 'host', label: t('server'), value: p.host, row: 'srv', flex: 3 },
         { k: 'port', label: t('port'), value: p.port, row: 'srv', flex: 1 },
         { k: 'user', label: t('user'), value: p.user },
-        { k: 'password', label: t('password'), type: 'password' }], { submit: t('sign_in'), error, themes: true, langs: true });
+        { k: 'password', label: t('password'), type: 'password' }], { submit: t('sign_in'), cancel: canCancel ? t('cancel') : null, error, themes: true, langs: true });
+      if (!v) return false;
       p = { proto: v.proto, host: v.host, port: v.port, user: v.user };
-      if (v.__lang) { await setLang(v.__lang); error = ''; continue; } // Dialog in neuer Sprache neu aufbauen, Eingaben bleiben
+      if (v.__lang) { await setLang(v.__lang); error = ''; continue; } // rebuild the dialog in the new language, keeping the input
       const host = v.host.trim().replace(/^https?:\/\//i, '').replace(/[\/:].*$/, '');
       const port = v.port.trim();
-      try { await call('login', `${v.proto}://${host}${port ? ':' + port : ''}`, v.user, v.password); return; } catch (e) { error = e.message; }
+      try { await call('login', `${v.proto}://${host}${port ? ':' + port : ''}`, v.user, v.password); return true; } catch (e) { error = e.message; }
     }
   }
 
   // ---- State ----
-  let fcol = 'c1', keynav = false; // fokussierte Spalte für Tastatur
-  // Suche: läuft über alle Bibliotheken, Ergebnisse erscheinen in Spalte 2 anstelle der Bibliotheksliste
+  let fcol = 'c1', keynav = false; // focused column for the keyboard
+  // Search: runs across all libraries, results appear in column 2 instead of the library list
   let searchOn = false, query = '', searching = false, focusSearch = false, searchToken = 0, searchTimer;
-  let letter = null; // aktiver Buchstabenfilter ('0-9', 'A'…'Z', '…') in der Bibliotheksliste
+  let letter = null; // active letter filter ('0-9', 'A'…'Z', '…') in the library list
   let libs = [], lib = -1, items = [], it = null, si = 0, ei = 0, sel = { v: 0, a: 0, s: 0 };
   const target = () => it.type === 'movie' ? it : it.seasons[si].eps[ei];
   const resetSel = () => { sel = { v: 0, a: 0, s: 0 }; };
@@ -132,7 +149,7 @@
     render();
   });
 
-  // ---- Suche ----
+  // ---- Search ----
   const listItems = () => searchOn ? (query.trim() ? call('search', query.trim()) : []) : call('items', libs[lib].id);
   const refreshList = () => { const l = app.querySelector('.c2 .lst'); if (l) l.innerHTML = listHtml(); };
   const runSearch = guard(async () => {
@@ -141,7 +158,7 @@
     searching = true;
     try {
       const res = await call('search', query.trim());
-      if (tok !== searchToken) return; // inzwischen neu getippt
+      if (tok !== searchToken) return; // typed again in the meantime
       items = res;
     } finally { if (tok === searchToken) { searching = false; refreshList(); } }
   });
@@ -161,14 +178,13 @@
   app.addEventListener('keydown', e => {
     if (!e.target.classList.contains('q')) return;
     if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
-    else if ((e.key === 'Enter' || e.key === 'ArrowDown') && items.length) { // erstes Ergebnis öffnen, Tastatur wandert in die Liste
+    else if ((e.key === 'Enter' || e.key === 'ArrowDown') && items.length) { // open the first result, keyboard moves into the list
       e.preventDefault(); clearTimeout(searchTimer); e.target.blur(); fcol = 'c2'; keynav = true; selectItem(0);
     }
   });
 
-  // Seitenumschlag der ganzen Oberfläche beim Öffnen/Verlassen von mpv (Drehung um die linke Kante)
-  // Wie bei einem aufgeschlagenen Buch: ein Bild der Oberfläche; die linke Hälfte bleibt liegen, die rechte Hälfte
-  // klappt als Blatt um die Mitte nach links (Vorderseite = Bild, Rückseite = Papier). Zurück = Animation rückwärts.
+  // Like an open book: one image of the UI; the left half stays, the right half
+  // turns as a leaf around the middle to the left (front = image, back = paper). Back = animation in reverse.
   let flip = null;
   async function pageOut() {
     if (reduceMotion || flip) return;
@@ -194,7 +210,7 @@
     };
     await flip.anims[0].finished;
   }
-  // frame: letztes Videobild von mpv; es liegt am Anfang auf Blattrückseite und rechter Seite, sodass der Übergang nahtlos beginnt
+  // frame: last video frame from mpv; at the start it covers the leaf back and the right side so the transition begins seamlessly
   async function pageBack(frame) {
     if (!flip) return;
     const f = flip; flip = null;
@@ -203,14 +219,16 @@
       const set = (sel, pos) => Object.assign(f.el.querySelector(sel).style,
         { backgroundImage: `url(${frame})`, backgroundSize: '200% 100%', backgroundPosition: pos });
       set('.fr', '100% 0'); set('.back', '0 0');
-    } catch { /* kaputtes Bild: Papierfarbe statt Video, der Umschlag muss trotzdem weg */ }
+    } catch { /* broken image: paper colour instead of video, the cover must go away anyway */ }
     f.anims.forEach(a => a.reverse());
     await f.anims[0].finished;
     f.el.remove();
   }
 
-  // Nach Ende von mpv: Gesehen-Status neu laden, Auswahl behalten
-  window.onPlaybackEnded = guard(async frame => {
+  // After mpv ends: reload the watched state, keep the selection
+  window.onPlaybackEnded = guard(async (frame, fs) => {
+    fsOn = !!fs; // fullscreen may have been toggled in the video: update the switch
+    app.querySelector('[data-fs]')?.classList.toggle('swon', fsOn);
     const back = pageBack(frame);
     if (!it) return back;
     const keep = { si, ei, sel };
@@ -219,14 +237,14 @@
   });
 
   // ---- Render ----
-  // Liste in Spalte 2: Bibliothek alphabetisch mit Buchstaben-Trennern, Suchergebnisse in Serverreihenfolge (Relevanz)
-  // Anfangs-Gruppe eines Titels: A–Z (Akzente ignoriert, Ä → A), Ziffern → '0-9', alles andere (z. B. Kana) → '…'
+  // List in column 2: library alphabetical with letter dividers, search results in server order (relevance)
+  // Initial group of a title: A–Z (accents ignored, Ä → A), digits → '0-9', everything else (e.g. kana) → '…'
   const bucket = name => {
     const c = (name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0).toUpperCase();
     return /[A-Z]/.test(c) ? c : /[0-9]/.test(c) ? '0-9' : '…';
   };
   const AZ = ['0-9', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
-  // Filterleiste 0-9, A–Z: Gruppen ohne Einträge sind abgeblendet, „…“ erscheint nur bei Bedarf
+  // Filter bar 0-9, A–Z: groups without entries are dimmed, “…” appears only when needed
   function azHtml() {
     const have = new Set(items.map(x => bucket(x.name)));
     return `<div class="az">${(have.has('…') ? [...AZ, '…'] : AZ).map(k =>
@@ -248,18 +266,25 @@
     const c1 = `<div class="h">${t('libraries')}</div>` +
       libs.map((l, i) => `<a class="item${i === lib ? ' on' : ''}" data-lib="${i}">${esc(l.name)}</a>`).join('') +
       `<a class="item${searchOn ? ' on' : ''}" data-act="search"><span>${t('search')}</span><span class="mark">/</span></a>` +
-      `<div class="foot"><div class="h">${t('theme')}</div>${THEMES.map(n => `<a class="item${n === theme ? ' on' : ''}" data-th="${n}">${n}</a>`).join('')}<div class="sp"></div><a class="item" data-act="account">${t('account')}</a><a class="item" data-act="settings">${t('settings')}</a></div>`;
+      `<div class="foot"><a class="item sw${fsOn ? ' swon' : ''}" data-fs title="F11"><span>${t('fullscreen')}</span><i class="tg"></i></a>
+      <div class="item row"><span>${t('theme')}</span><span class="dd"><select class="sel" data-theme-sel>${THEMES.map(n => `<option${n === theme ? ' selected' : ''}>${n}</option>`).join('')}</select></span></div>
+      <div class="item row"><span>${t('scale')}</span><span class="stp"><a class="${scale <= 50 ? 'off' : ''}" data-sc="-10">−</a><span>${scale}%</span><a class="${scale >= 200 ? 'off' : ''}" data-sc="10">+</a></span></div>
+      <a class="item" data-act="account">${t('account')}</a><a class="item" data-act="settings">${t('settings')}</a></div>`;
     const c2 = (searchOn
       ? `<div class="h sh"><input class="q" size="14" placeholder="${esc(t('search_placeholder'))}" value="${esc(query)}" spellcheck="false" autocomplete="off"></div>`
       : `<div class="h">${esc(libs[lib]?.name)} · ${letter ? shownCount() + '/' : ''}${items.length}</div>`) + `<div class="lst">${listHtml()}</div>`;
     const section = ([n, c]) => `<section class="col c${n}">${c}</section>`;
-    const before = new Set([...app.querySelectorAll('.col')].map(colNo));
-    // Spalten, die neu dazukommen, klappen auf (beim allerersten Aufbau nicht)
+    const old = [...app.querySelectorAll('.col')].map(c => [c, c.getBoundingClientRect(), c.scrollTop]);
+    const before = new Set(old.map(([c]) => colNo(c)));
+    // Columns that are added unfold (not on the very first build); columns that go away fold shut
     const commit = parts => {
       app.innerHTML = parts.map(section).join('');
-      finish(keep, before.size ? parts.map(p => p[0]).filter(n => !before.has(n)) : []);
+      const fresh = it && it.id !== shownId; // another entry selected: columns 3–5 unfold again
+      shownId = it?.id;
+      finish(keep, before.size ? parts.map(p => p[0]).filter(n => !before.has(n) || (fresh && n >= 3)) : []);
+      foldAway(old.filter(([c]) => !parts.some(p => p[0] === colNo(c))));
     };
-    // Spalten erscheinen schrittweise: erst nur 1, nach Bibliothek-Klick 2, nach Eintrag-Klick alle
+    // Columns appear step by step: only 1 at first, 2 after a library click, all after an entry click
     if (!it) { commit(lib < 0 && !searchOn ? [[1, c1]] : [[1, c1], [2, c2]]); return; }
     const cur = target();
     const c3 = `<div class="d"><div class="poster" style="--hue:${hue(it.name)};${it.poster ? `background-image:url('${esc(it.poster)}')` : ''}"></div><h1>${esc(it.name)}</h1>
@@ -268,7 +293,7 @@
       `<div class="letter">${esc(t('season', { n: s.n }))}</div>` + s.eps.map((e, b) =>
         `<a class="item${a === si && b === ei ? ' on' : ''}${e.seen ? ' seen' : ''}" data-ep="${a}.${b}"><span>${e.seen ? '✓' : '○'} ${esc(e.n)}. ${esc(e.t)}</span><span class="meta">${esc(e.min)} ${t('min')}</span></a>`).join('')).join('');
     const title = it.type === 'movie' ? it.name : `S${it.seasons[si].n}E${cur.n} · ${cur.t}`;
-    // 'subs_off': der letzte Untertitel-Eintrag ist immer „Aus“, den Text liefert die Sprachdatei
+    // 'subs_off': the last subtitle entry is always “Off”, the text comes from the language file
     const list = (k, label) => `<div class="h">${label}</div>` + cur.st[k].map((n, i, arr) =>
       `<a class="item${sel[k] === i ? ' on' : ''}" data-st="${k}.${i}"><span>${esc(k === 's' && i === arr.length - 1 ? t('subs_off') : n)}</span><span class="mark">${sel[k] === i ? '●' : ''}</span></a>`).join('');
     const c5 = `<div class="d"><h1>${esc(title)}</h1><div class="meta">${it.type === 'series' ? esc(it.name) + ' · ' : ''}${esc(cur.min)} ${t('min')}</div></div>` +
@@ -277,13 +302,27 @@
     commit([[1, c1], [2, c2], [3, c3], ...(it.type === 'series' ? [[4, c4]] : []), [5, c5]]);
   }
 
+  // Back: the old columns (always the trailing ones) stay as a copy on top of the window and fold shut from right to left
+  let shownId = null;
+  function foldAway(gone) {
+    if (reduceMotion) return;
+    gone.forEach(([c, r, top], k) => {
+      Object.assign(c.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+      c.style.setProperty('--i', gone.length - 1 - k);
+      c.classList.add('folding');
+      document.body.append(c); // outside #app so render()/layout() do not count them
+      c.scrollTop = top;
+      setTimeout(() => c.remove(), 1000);
+    });
+  }
+
   function finish(keep, added) {
     layout(added);
     app.querySelectorAll('.col').forEach(c => c.scrollTop = keep[c.classList[1]] || 0);
     if (!app.querySelector('.col.' + fcol)) fcol = 'c1';
     const fc = app.querySelector('.col.' + fcol);
     fc.classList.add('focus');
-    if (focusSearch) { // Suchfeld nach dem Neuaufbau wieder aktivieren (Cursor ans Ende)
+    if (focusSearch) { // re-activate the search field after the rebuild (cursor at the end)
       const q = app.querySelector('.q');
       if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
       focusSearch = false;
@@ -291,8 +330,9 @@
     if (keynav) { fc.querySelector('.item.on')?.scrollIntoView({ block: 'nearest' }); keynav = false; }
   }
 
-  // ---- Tastatur: ←→ Spalte, ↑↓ Auswahl, Buchstabe springt in der Liste, Enter = Abspielen ----
+  // ---- Keyboard: ←→ column, ↑↓ selection, a letter jumps in the list, Enter = play ----
   document.addEventListener('keydown', e => {
+    if (e.key === 'F11') { e.preventDefault(); app.querySelector('[data-fs]')?.click(); return; }
     if (document.querySelector('.dlg') || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.ctrlKey || e.altKey || e.metaKey) return;
     const cols = ['c1', 'c2', 'c4', 'c5'].filter(c => app.querySelector('.col.' + c));
     const attr = { c1: 'lib', c2: 'item', c4: 'ep' }[fcol];
@@ -316,16 +356,16 @@
     e.preventDefault(); keynav = true; els[i]?.click();
   });
 
-  // ---- Spaltenbreiten: automatisch passend zum Inhalt (fit-content, gedeckelt in % der Fensterbreite).
-  // Per Ziehen setzt man eine feste Breite für diese Spalte, Doppelklick auf den Griff = wieder automatisch. ----
-  const CAP = { 1: 220, 2: 340, 3: 380, 4: 340, 5: 400 }; // feste Obergrenzen in px: das Fenster passt sich den Spalten an, nicht umgekehrt
+  // ---- Column widths: automatic to fit the content (fit-content, capped).
+  // Dragging sets a fixed width for that column, double-click on the handle = automatic again. ----
+  const CAP = { 1: 220, 2: 340, 3: 380, 4: 340, 5: 400 }; // fixed caps in px: the window adapts to the columns, not the other way round
   let M = {};
   try { M = JSON.parse(localStorage.getItem('manualWidths')) || {}; } catch (_) {}
   const saveM = () => { try { localStorage.setItem('manualWidths', JSON.stringify(M)); } catch (_) {} };
   const colNo = c => +c.className.match(/\bc(\d)\b/)[1];
   function template() {
     app.style.gridTemplateColumns = [...app.querySelectorAll('.col')]
-      .map(c => { const n = colNo(c); return M[n] ? M[n] + 'px' : `fit-content(${CAP[n]}px)`; }).join(' ') + ' 1fr';
+      .map(c => { const n = colNo(c); return M[n] ? M[n] + 'px' : `fit-content(${Math.round(CAP[n] * scale / 100)}px)`; }).join(' ') + ' 1fr';
   }
   function place() {
     app.querySelectorAll('.rz').forEach(h => {
@@ -338,13 +378,11 @@
     app.insertAdjacentHTML('beforeend', [...app.querySelectorAll('.col')].map(c => `<div class="rz" data-rz="${colNo(c)}"></div>`).join(''));
     place();
   };
-  // Neue Spalten (added) klappen auf: ihre Breite wächst von 0 auf das Zielmaß, der Inhalt gleitet ein.
-  // Dazu kurz feste px-Breiten animieren, danach zurück auf die automatische Breite (fit-content).
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let unfoldToken = 0;
-  // Fensterbreite = Summe der sichtbaren Spalten (mindestens MINW); nur senden, wenn sie sich ändert
+  // Window width = sum of the visible columns (at least MINW); only send when it changes
   const MINW = 420;
-  let lastFit = MINW; // Startfenster ist bereits MINW breit
+  let lastFit = MINW; // the start window is already MINW wide
   const fit = sum => {
     const want = Math.max(Math.round(sum), MINW);
     if (!raw.fit_window || want === lastFit) return;
@@ -357,17 +395,18 @@
     app.querySelectorAll('.rz').forEach(h => h.remove());
     template();
     const cols = [...app.querySelectorAll('.col')];
-    const fin = cols.map(c => c.offsetWidth); // Zielbreiten (erzwingt Layout)
+    const fin = cols.map(c => c.offsetWidth); // target widths (forces layout)
     fit(fin.reduce((a, b) => a + b, 0));
     if (!added.length || reduceMotion) { handles(); return; }
-    // Seitenumschlag: Spalte hat sofort ihre Breite, ihr Inhalt klappt wie eine Buchseite um die linke Kante auf
+    // Page turn: the column has its width at once, its content opens like a book page around the left edge
     cols.filter(c => added.includes(colNo(c))).forEach((c, k) => { c.style.setProperty('--i', k); c.classList.add('unfolding'); });
     handles();
     setTimeout(() => {
-      if (token !== unfoldToken) return; // inzwischen neu gerendert
+      if (token !== unfoldToken) return; // rendered again in the meantime
       cols.forEach(c => { c.classList.remove('unfolding'); c.style.removeProperty('--i'); });
     }, 1000);
   }
+  window.refit = () => { lastFit = 0; layout(); }; // after fullscreen: fit the window width to the columns again
   app.addEventListener('pointerdown', e => {
     const h = e.target.closest('[data-rz]');
     if (!h) return;
@@ -386,7 +425,7 @@
     if (h) { delete M[+h.dataset.rz]; template(); place(); saveM(); }
   });
 
-  // ---- Klicks ----
+  // ---- Clicks ----
   app.addEventListener('click', guard(async e => {
     const q = a => e.target.closest(`[data-${a}]`);
     let x;
@@ -394,10 +433,15 @@
     if (col) { const c = [...col.classList].find(n => /^c\d$/.test(n)); fcol = c === 'c3' ? 'c2' : c; }
     if ((x = q('az'))) {
       if (x.classList.contains('off')) return;
-      letter = letter === x.dataset.az ? null : x.dataset.az; // erneuter Klick hebt den Filter auf
+      letter = letter === x.dataset.az ? null : x.dataset.az; // clicking again clears the filter
       render(); app.querySelector('.c2').scrollTop = 0;
       return;
-    } else if ((x = q('th'))) setTheme(x.dataset.th);
+    } else if ((x = q('fs'))) { // no render(): the switch should flip with a transition
+      if (raw.toggle_fullscreen) await call('toggle_fullscreen');
+      fsOn = !fsOn; x.classList.toggle('swon', fsOn);
+      return;
+    }
+    else if ((x = q('sc'))) setScale(scale + +x.dataset.sc);
     else if ((x = q('lib'))) return selectLib(+x.dataset.lib);
     else if ((x = q('item'))) return selectItem(+x.dataset.item);
     else if ((x = q('ep'))) { [si, ei] = x.dataset.ep.split('.').map(Number); resetSel(); }
@@ -406,8 +450,15 @@
       if (x.dataset.act === 'search') { openSearch(); return; }
       const st = await call('state');
       if (x.dataset.act === 'account') {
-        const v = await form(t('account'), [], { submit: t('sign_out'), cancel: t('close'), note: `${st.user} @ ${st.server}` });
-        if (v) { await call('logout'); await login(); libs = await call('libraries'); lib = -1; items = []; it = null; searchOn = false; query = ''; render(); return; }
+        const v = await form(t('account'), [], { submit: t('add_account'), cancel: t('close'), out: t('sign_out'),
+          accounts: { list: st.accounts, on: st.active } });
+        if (!v) return;
+        if (v.__acc !== undefined) { if (v.__acc === st.active) return; await call('switch_account', v.__acc); }
+        else if (v.__out) await call('logout');
+        else if (!(await login({ server: st.server }, true))) return;
+        if (!(await call('state')).logged_in) await login();
+        libs = await call('libraries'); lib = -1; items = []; it = null; searchOn = false; query = ''; render();
+        return;
       } else {
         const EMB = t('play_embedded'), EXT = t('play_external');
         const langs = I18N.languages();
@@ -426,7 +477,7 @@
     } else if (q('play')) {
       const cs = getComputedStyle(document.body);
       const s = await call('state');
-      const flip = s.can_embed && s.embed; // eingebettet: Oberfläche schlägt wie eine Buchseite um, dahinter erscheint das Video
+      const flip = s.can_embed && s.embed; // embedded: the UI turns like a book page, the video appears behind it
       if (flip) await pageOut();
       let r;
       try { r = await call('play', target().id, sel.v, sel.a, sel.s, { bg: cs.backgroundColor, fg: cs.color, back: t('back') }); }
@@ -437,10 +488,14 @@
     render();
   }));
 
+  app.addEventListener('change', e => {
+    if (e.target.matches('[data-theme-sel]')) { setTheme(e.target.value); render(); }
+  });
+
   // ---- Start ----
   await guard(async () => {
     const st = await call('state');
-    I18N.set(st.lang || I18N.detect()); // gespeicherte Sprache, sonst Systemsprache
+    I18N.set(st.lang || I18N.detect()); // saved language, otherwise the system language
     if (!st.logged_in) await login(st);
     libs = await call('libraries');
     render();

@@ -1,12 +1,12 @@
-/* Struktur für alle Designs; Designs setzen nur Variablen + Extras */
+/* Structure for all themes; themes only set variables + extras */
 :root{--w:11rem 17rem 1.2fr 1.1fr 1fr;--bw:1px;--pad:12px;--ip:.6em;--fs:14px;--font:system-ui,sans-serif;--hov:rgba(128,128,128,.12);--radius:0}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{background:var(--bg);color:var(--fg);font:var(--fs)/1.4 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
-/* width:max-content: Spalten bekommen ihre natürliche Breite, auch wenn das Fenster (noch) schmaler ist; das Fenster wächst dann nach */
+body{background:var(--bg);color:var(--fg);font:calc(var(--fs) * var(--sc,1))/1.4 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
+/* width:max-content: columns get their natural width even if the window is (still) narrower; the window then grows to fit */
 #app{display:grid;grid-template-columns:var(--w);height:100vh;width:max-content;min-width:100%}
 #app{position:relative}
-/* Seitenumschlag beim Öffnen/Verlassen von mpv (Aufbau in app.js: pageOut) */
+/* Page turn when opening/leaving mpv (built in app.js: pageOut) */
 .flip{position:fixed;inset:0;z-index:50;background:var(--bg);perspective:2600px;overflow:hidden}
 .flip>*{position:absolute;top:0;bottom:0;width:50%}
 .fl{left:0}
@@ -23,7 +23,7 @@ body{background:var(--bg);color:var(--fg);font:var(--fs)/1.4 var(--font);-webkit
 body.dragging{user-select:none;cursor:col-resize}
 .sp{height:.8em}
 .lst{display:contents}
-/* Buchstabenleiste 0-9, A–Z: bleibt beim Scrollen oben stehen */
+/* Letter bar 0-9, A–Z: stays at the top while scrolling */
 .az{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:1px 2px;padding:.3em var(--ip) .4em;margin-bottom:.2em;background:var(--colbg,var(--bg))}
 .az-k{cursor:pointer;color:var(--fg);font-size:.78em;padding:.1em .38em;border-radius:var(--radius);user-select:none}
 .az-k:hover{background:var(--hov)}
@@ -33,14 +33,35 @@ body.dragging{user-select:none;cursor:col-resize}
 .q{width:100%;font:inherit;text-transform:none;letter-spacing:normal;color:var(--fg);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:.25em 0;outline:none}
 .q:focus{border-bottom-color:var(--fg)}
 .q::placeholder{color:var(--dim)}
-/* Neue Spalte: Inhalt schlägt wie eine Buchseite um die linke Kante auf (mehrere Spalten nacheinander) */
+/* New column: content opens like a book page around the left edge (several columns one after another) */
 .col.unfolding{overflow:hidden;perspective:1400px;perspective-origin:0 50%}
 .col.unfolding>*{transform-origin:0 50%;backface-visibility:hidden;animation:page-turn .75s cubic-bezier(.25,.8,.25,1) calc(var(--i,0) * .15s) both}
 @keyframes page-turn{0%{transform:rotateY(-100deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+/* Back: columns that go away fold shut (counterpart of unfolding; transparent background so only the content turns) */
+.col.folding{position:fixed;z-index:40;overflow:hidden;perspective:1400px;perspective-origin:0 50%;pointer-events:none;background:transparent;border-color:transparent}
+.col.folding>*{transform-origin:0 50%;backface-visibility:hidden;animation:page-fold .6s cubic-bezier(.55,0,.75,.35) calc(var(--i,0) * .12s) both}
+@keyframes page-fold{0%{transform:none;opacity:1}70%{opacity:1}100%{transform:rotateY(-100deg);opacity:0}}
 @media (prefers-reduced-motion:reduce){.col.unfolding>*{animation:none}}
 .d .meta{white-space:normal}
-.col{overflow:auto;overflow-x:hidden;padding:var(--pad);border-right:var(--bw) solid var(--line);min-width:110px;display:flex;flex-direction:column;gap:1px;background:var(--colbg,transparent)}
-/* Scrollbalken im Theme (nur ::-webkit-scrollbar, denn scrollbar-width/-color würden es in Chromium überschreiben) */
+/* Switch (fullscreen): pill with a knob, colours from the theme */
+.tg{position:relative;flex:none;width:2.4em;height:1.3em;border-radius:1em;background:var(--line);box-shadow:inset 0 .12em .3em rgba(0,0,0,.4);transition:background .2s}
+.tg::after{content:"";position:absolute;top:.15em;left:.15em;width:1em;height:1em;border-radius:50%;background:var(--dim);box-shadow:0 .08em .25em rgba(0,0,0,.45);transition:transform .2s,background .2s}
+.sw.swon .tg{background:var(--fg)}
+.sw.swon .tg::after{background:var(--bg);transform:translateX(1.1em)}
+/* Rows in the foot of column 1 (switch, select, stepper): all like .item, label on the left, control on the right */
+.sw,.row{align-items:center}
+.row{cursor:default}
+.row:hover{background:none}
+.sel{font:inherit;color:var(--fg);background:transparent;border:0;padding:0;text-align:right;cursor:pointer;appearance:none;-webkit-appearance:none;outline:0}
+.sel option{background:var(--bg);color:var(--fg)}
+.dd{display:flex;align-items:center}
+.dd::after{content:"▾";color:var(--dim);margin-left:.3em;pointer-events:none}
+.stp{display:flex;align-items:center;gap:.4em}
+.stp a{cursor:pointer;padding:0 .4em;user-select:none}
+.stp a:hover{background:var(--hov)}
+.stp a.off{opacity:.35;pointer-events:none}
+.col{overflow:auto;overflow-x:hidden;padding:calc(var(--pad) * var(--sc,1));border-right:var(--bw) solid var(--line);min-width:110px;display:flex;flex-direction:column;gap:1px;background:var(--colbg,transparent)}
+/* Scrollbars in the theme (only ::-webkit-scrollbar, because scrollbar-width/-color would override it in Chromium) */
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--dim);border-radius:var(--radius);opacity:.6}
@@ -58,7 +79,7 @@ body.dragging{user-select:none;cursor:col-resize}
 .item.seen:not(.on){opacity:.45}
 .foot{margin-top:auto;padding-top:1em}
 .d{padding:0 var(--ip)}
-.poster{aspect-ratio:2/3;width:100%;max-width:200px;background:linear-gradient(160deg,hsl(var(--hue) 40% 45%),hsl(calc(var(--hue) + 40) 40% 20%));border-radius:var(--radius);margin-bottom:1em}
+.poster{aspect-ratio:2/3;width:100%;max-width:calc(200px * var(--sc,1));background:linear-gradient(160deg,hsl(var(--hue) 40% 45%),hsl(calc(var(--hue) + 40) 40% 20%));border-radius:var(--radius);margin-bottom:1em}
 h1{font-size:1.5em;font-weight:var(--hw,600);line-height:1.15;margin-bottom:.3em}
 .d p{white-space:pre-line;overflow-wrap:anywhere;margin-top:.8em;color:var(--fg);opacity:.8;max-width:42ch}
 .poster{background-size:cover;background-position:center}
@@ -79,3 +100,5 @@ h1{font-size:1.5em;font-weight:var(--hw,600);line-height:1.15;margin-bottom:.3em
 .note{color:var(--dim);font-size:.78em;margin-top:.6em;padding:0 var(--ip)}
 .toast{position:fixed;left:50%;bottom:16px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;background:var(--fg);color:var(--bg);padding:.6em 1em;font:12px/1.3 Consolas,monospace;max-width:90vw;border-radius:var(--radius)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.dlg .accs{display:flex;flex-direction:column}
+.dlg .accs .item{padding:.4em .6em}

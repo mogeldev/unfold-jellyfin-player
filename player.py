@@ -1,5 +1,5 @@
-"""Wiedergabe über libmpv (python-mpv). Unter Windows liegt libmpv-2.dll in lib/ (siehe tools/fetch_libmpv.py),
-unter Linux kommt libmpv aus dem Paketmanager (libmpv2 / mpv-libs). mpv öffnet ein eigenes Fenster."""
+"""Playback via libmpv (python-mpv). On Windows libmpv-2.dll lives in lib/ (see tools/fetch_libmpv.py),
+on Linux libmpv comes from the package manager (libmpv2 / mpv-libs). mpv opens its own window."""
 import os
 import sys
 import threading
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from errors import AppError
 
-BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))  # _MEIPASS: entpackter Ordner im PyInstaller-Build
+BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))  # _MEIPASS: unpacked folder in the PyInstaller build
 LIB = BASE / "lib"
 if os.name == "nt" and LIB.is_dir():
     os.add_dll_directory(str(LIB))
@@ -36,14 +36,14 @@ def parse_opts(text: str) -> dict:
 def launch(url: str, title: str, vid: int | None, aid: int | None, sid: int | str | None,
            start: float, extra_opts: str, on_progress, on_stop, wid: int | None = None, on_fullscreen=None,
            sub_files: list[str] | None = None, on_quit=None) -> None:
-    """Startet mpv und kehrt sofort zurück. on_progress(pos_s) etwa alle 10 s, on_stop(pos_s) beim Beenden.
-    Mit wid rendert mpv in dieses Fenster (eingebettet), sonst in ein eigenes."""
+    """Starts mpv and returns immediately. on_progress(pos_s) about every 10 s, on_stop(pos_s) on exit.
+    With wid mpv renders into that window (embedded), otherwise into its own."""
     mpv = _import_mpv()
     opts = {"input_default_bindings": True, "input_vo_keyboard": True, "osc": True, "ytdl": False,
             "force_window": "yes", "force_media_title": title}
     if wid is not None:
         opts["wid"] = str(wid)
-    # Bei externen Untertiteln wird die Spur erst nach dem Nachladen gesetzt (die Nummer kann auf eine externe zeigen)
+    # With external subtitles the track is set only after loading (the number may point to an external one)
     for k, v in (("vid", vid), ("aid", aid), ("sid", None if sub_files else sid)):
         if v is not None:
             opts[k] = v
@@ -55,13 +55,13 @@ def launch(url: str, title: str, vid: int | None, aid: int | None, sid: int | st
     if sub_files:
         @m.event_callback("file-loaded")
         def _loaded(_event):
-            for u in sub_files:  # landen als Spuren nach den eingebetteten, in dieser Reihenfolge
+            for u in sub_files:  # they become tracks after the embedded ones, in this order
                 m.command("sub-add", u, "auto")
             if sid is not None:
                 m.sid = sid
 
     if wid is not None:
-        # eingebettet gibt es kein Fenster-X: Esc beendet und kehrt zur Bibliothek zurück (vorher letztes Bild festhalten)
+        # embedded there is no window X: Esc quits and returns to the library (grab the last frame first)
         def _esc(state="d", *_a):
             if str(state)[:1] in ("d", "p"):
                 if on_quit:
@@ -69,8 +69,8 @@ def launch(url: str, title: str, vid: int | None, aid: int | None, sid: int | st
                 m.command("quit")
         m.register_key_binding("ESC", _esc)
         if on_fullscreen:
-            # Vollbild (Taste f, Knopf der Leiste, Doppelklick) betrifft sonst nur das mpv-Kindfenster:
-            # Eigenschaft sofort zurücksetzen und stattdessen das ganze App-Fenster umschalten
+            # Fullscreen (key f, bar button, double click) would only affect the mpv child window:
+            # reset the property at once and toggle the whole app window instead
             @m.property_observer("fullscreen")
             def _fs(_name, value):
                 if value:
@@ -86,11 +86,11 @@ def launch(url: str, title: str, vid: int | None, aid: int | None, sid: int | st
         state["pos"] = float(value)
         if time.time() - state["last"] >= 10:
             state["last"] = time.time()
-            # nicht im mpv-Eventthread blockieren (HTTP)
+            # do not block the mpv event thread (HTTP)
             threading.Thread(target=on_progress, args=(state["pos"],), daemon=True).start()
 
     def wait():
-        # libmpv bleibt nach Dateiende im Idle: auf Wiedergabeende ODER Fenster schließen (ShutdownError) warten
+        # libmpv stays idle after the end of file: wait for end of playback OR window close (ShutdownError)
         try:
             m.wait_for_playback()
         except mpv.ShutdownError:

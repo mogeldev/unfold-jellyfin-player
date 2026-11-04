@@ -1,7 +1,7 @@
 // Deutsch
 (window.LOCALES ||= {}).de = {
   _name: 'Deutsch',
-  libraries: 'Bibliotheken', theme: 'Design', account: 'Konto', settings: 'Einstellungen', language: 'Sprache',
+  libraries: 'Bibliotheken', fullscreen: 'Vollbild', theme: 'Design', scale: 'Textgröße', account: 'Konto', add_account: 'Konto hinzufügen', settings: 'Einstellungen', language: 'Sprache',
   episodes: 'Episoden', season: 'Staffel {n}', seasons_one: '{n} Staffel', seasons_other: '{n} Staffeln',
   search: 'Suche', search_placeholder: 'Suchen …', no_results: 'Keine Treffer',
   series: 'Serie', watched: '✓ gesehen', min: 'min',

@@ -1,12 +1,12 @@
-"""Erzeugt assets/icon.ico, icon.png und icon.svg: vier Spalten, die sich nach rechts aufklappen (breiter werden),
-die letzte mit Play-Dreieck. Aufruf: python tools/make_icon.py  (benötigt: pip install pillow)"""
+"""Generates assets/icon.ico, icon.png and icon.svg: four columns unfolding to the right (getting wider),
+the last one with a play triangle. Usage: python tools/make_icon.py  (needs: pip install pillow)"""
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 OUT = Path(__file__).resolve().parent.parent / "assets"
-S = 1024                                   # Zeichenfläche
-BG, ACCENT = "#0b0f0b", "#b6f2b6"          # Hintergrund und Akzent wie im terminal-Theme
+S = 1024                                   # canvas
+BG, ACCENT = "#0b0f0b", "#b6f2b6"          # background and accent as in the terminal theme
 COLORS = ["#2f5a35", "#4f8f58", "#82c98d", ACCENT]
 WIDTHS = [60, 110, 180, 280]
 GAP, TOP, BOTTOM, R_BAR, R_ICON = 36, 232, 792, 26, 224
@@ -17,11 +17,11 @@ for w in WIDTHS:
     bars.append((x, TOP, x + w, BOTTOM))
     x += w + GAP
 cx, cy = (bars[-1][0] + bars[-1][2]) // 2, (TOP + BOTTOM) // 2
-tri = [(cx - 46, cy - 76), (cx - 46, cy + 76), (cx + 62, cy)]  # Play-Dreieck in der letzten Spalte
+tri = [(cx - 46, cy - 76), (cx - 46, cy + 76), (cx + 62, cy)]  # play triangle in the last column
 
 
 def render(size: int) -> Image.Image:
-    k = 4                                  # Supersampling für glatte Kanten
+    k = 4                                  # supersampling for smooth edges
     img = Image.new("RGBA", (S * k, S * k), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((0, 0, S * k - 1, S * k - 1), R_ICON * k, fill=BG)

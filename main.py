@@ -1,10 +1,11 @@
-"""Unfold – Jellyfin Player: pywebview-Fenster mit dem Frontend aus web/. Alle öffentlichen Api-Methoden sind per JS aufrufbar."""
+"""Unfold – Jellyfin Player: pywebview window with the frontend from web/. All public Api methods are callable from JS."""
 import functools
 import html
 import json
 import os
 import re
 import threading
+import uuid
 from pathlib import Path
 
 import webview
@@ -12,40 +13,56 @@ import webview
 import chrome
 import config
 import player
-from jellyfin import TICKS, Jellyfin, JellyfinError, external_subs, minutes, streams
+from jellyfin import TICKS, Jellyfin, JellyfinError, external_subs, minutes, normalize, streams
 
 WEB = player.BASE / "web"
 
 
 def rpc(fn):
-    """Antwort immer als {ok, data} bzw. {ok: False, error}, damit das Frontend einheitlich reagieren kann."""
+    """Always answer as {ok, data} or {ok: False, error} so the frontend can react uniformly."""
     @functools.wraps(fn)
     def wrapper(self, *a):
         try:
             return {"ok": True, "data": fn(self, *a)}
-        except JellyfinError as e:  # AppError: Code + Parameter, das Frontend übersetzt
+        except JellyfinError as e:  # AppError: code + params, the frontend translates
             return {"ok": False, "code": e.code, "params": e.params, "error": e.code}
-        except Exception as e:  # noqa: BLE001 - Fehler sollen in der UI landen, nicht das Fenster beenden
+        except Exception as e:  # noqa: BLE001 - errors should end up in the UI, not close the window
             return {"ok": False, "error": f"{type(e).__name__}: {e}"}
     return wrapper
 
 
 def _text(s: str) -> str:
-    """Jellyfin-Beschreibungen enthalten oft HTML (<br>, <i> …): in Klartext mit Zeilenumbrüchen wandeln."""
+    """Jellyfin descriptions often contain HTML (<br>, <i> …): convert to plain text with line breaks."""
     s = re.sub(r"<br\s*/?>", "\n", s or "", flags=re.I)
     return html.unescape(re.sub(r"<[^>]+>", "", s)).strip()
 
 
 class Api:
-    # Attribute mit _ sind für JS unsichtbar
+    # attributes starting with _ are invisible to JS
     def __init__(self):
         self._cfg = config.load()
         self._window = None
         self._embed = None
+        self._fs, self._bg = False, None  # fullscreen on/off, theme colour of the title bar
         self._jf = None
-        token = config.get_token(self._cfg)
-        if token and self._cfg.get("server") and self._cfg.get("user_id"):
-            self._jf = Jellyfin(self._cfg["server"], self._cfg["device_id"], token, self._cfg["user_id"])
+        accs = self._cfg.setdefault("accounts", [])
+        if not accs and self._cfg.get("server") and self._cfg.get("user_id"):  # config from the time of a single account
+            accs.append({"server": self._cfg["server"], "user": self._cfg["user"], "user_id": self._cfg["user_id"],
+                         "device_id": self._cfg["device_id"], **({"token": self._cfg.pop("token")} if self._cfg.get("token") else {})})
+        self._connect(self._cfg.get("active", 0))
+
+    def _connect(self, i: int) -> None:
+        """Activate account i. Without a valid account or token _jf stays empty (the frontend then shows the login).
+        Every account has its own device_id so sign-ins on the same server do not sign each other out."""
+        accs = self._cfg["accounts"]
+        self._jf = None
+        if not 0 <= i < len(accs):
+            return
+        a = accs[i]
+        self._cfg.update(active=i, server=a["server"], user=a["user"], user_id=a["user_id"])
+        token = config.get_token(a)
+        if token:
+            self._jf = Jellyfin(a["server"], a["device_id"], token, a["user_id"])
 
     def _need(self) -> Jellyfin:
         if not self._jf:
@@ -57,7 +74,8 @@ class Api:
         return {"logged_in": bool(self._jf), "server": self._cfg.get("server", ""),
                 "user": self._cfg.get("user", ""), "mpv_opts": self._cfg.get("mpv_opts", ""),
                 "embed": self._cfg.get("embed", True), "can_embed": self._embed is not None,
-                "lang": self._cfg.get("lang", "")}
+                "lang": self._cfg.get("lang", ""), "active": self._cfg.get("active", 0),
+                "accounts": [f"{a['user']} @ {a['server']}" for a in self._cfg["accounts"]]}
 
     @rpc
     def set_lang(self, lang):
@@ -66,21 +84,33 @@ class Api:
 
     @rpc
     def login(self, server, user, password):
-        jf = Jellyfin(server, self._cfg["device_id"])
+        """Sign in a new account and activate it; the same account (server + user) is only updated."""
+        accs = self._cfg["accounts"]
+        i = next((n for n, a in enumerate(accs) if a["server"] == normalize(server) and a["user"] == user), len(accs))
+        jf = Jellyfin(server, accs[i]["device_id"] if i < len(accs) else uuid.uuid4().hex)
         jf.login(user, password)
-        self._cfg.update(server=jf.server, user=user, user_id=jf.user_id)
-        config.set_token(self._cfg, jf.token)
+        acc = {"server": jf.server, "user": user, "user_id": jf.user_id, "device_id": jf.device_id}
+        config.set_token(acc, jf.token)
+        accs[i:i + 1] = [acc]
+        self._connect(i)
         config.save(self._cfg)
-        self._jf = jf
+
+    @rpc
+    def switch_account(self, i):
+        self._connect(int(i))
+        config.save(self._cfg)
 
     @rpc
     def logout(self):
+        """Sign out and remove the active account; a remaining one becomes active."""
+        accs, i = self._cfg["accounts"], self._cfg.get("active", 0)
         if self._jf:
             self._jf.logout()
-        config.clear_token(self._cfg)
+        if 0 <= i < len(accs):
+            config.clear_token(accs.pop(i))
         self._cfg.pop("user_id", None)
+        self._connect(0)
         config.save(self._cfg)
-        self._jf = None
 
     @rpc
     def save_settings(self, s):
@@ -90,19 +120,36 @@ class Api:
 
     @rpc
     def set_chrome(self, bg):
-        """Titelleiste und Rahmen in der Hintergrundfarbe des Themes (nur Windows)."""
+        """Title bar and border in the theme background colour (Windows only)."""
+        self._bg = bg
         if self._embed:
             hwnd = self._embed._ui(lambda: int(self._window.native.Handle.ToInt64()))
             chrome.set_chrome(hwnd, bg, bg)
+            if self._fs:  # theme change while fullscreen: keep the border off
+                chrome.set_fullscreen_frame(hwnd, True)
+
+    def _toggle_fs(self):
+        self._window.toggle_fullscreen()
+        self._fs = not self._fs
+        if self._embed:
+            hwnd = self._embed._ui(lambda: int(self._window.native.Handle.ToInt64()))
+            chrome.set_fullscreen_frame(hwnd, self._fs, self._bg)
+        if not self._fs:  # width is not adjusted while fullscreen: refit to the columns after leaving it
+            threading.Timer(0.6, lambda: self._window.evaluate_js("window.refit && window.refit()")).start()
+
+    @rpc
+    def toggle_fullscreen(self):
+        """Fullscreen of the app window (library and playback)."""
+        self._toggle_fs()
 
     @rpc
     def snapshot(self):
-        """Bild der Oberfläche für den Seitenumschlag; None ohne Einbettung."""
+        """Image of the UI for the page turn; None without embedding."""
         return self._embed.snapshot() if self._embed else None
 
     @rpc
     def fit_window(self, inner_px):
-        """Fensterbreite an die sichtbaren Spalten anpassen (Animation läuft im Hintergrund-Thread)."""
+        """Fit the window width to the visible columns (the animation runs in a background thread)."""
         if self._embed:
             hwnd = self._embed._ui(lambda: int(self._window.native.Handle.ToInt64()))
             threading.Thread(target=chrome.fit_width, args=(hwnd, inner_px), daemon=True).start()
@@ -124,7 +171,7 @@ class Api:
 
     @rpc
     def search(self, term):
-        """Suche über alle Bibliotheken (Filme und Serien), serverseitig nach Relevanz sortiert."""
+        """Search across all libraries (movies and series), sorted by relevance on the server."""
         term = (term or "").strip()
         return [self._summary(i) for i in self._need().search(term)] if term else []
 
@@ -155,12 +202,12 @@ class Api:
         url = jf.stream_url(item_id, ms_id, psid)
         resume = ((dto.get("UserData") or {}).get("PlaybackPositionTicks") or 0) / TICKS
         runtime = dto.get("RunTimeTicks")
-        # mpv zählt je Spurtyp ab 1, in derselben Reihenfolge wie Jellyfin
+        # mpv counts per track type from 1, in the same order as Jellyfin
         vid = v + 1 if st["v"] else None
         aid = a + 1 if st["a"] else None
         has_subs = len(st["s"]) > 1
         sid = None if not has_subs else ("no" if s == len(st["s"]) - 1 else s + 1)
-        # Externe Textuntertitel stehen in der Liste hinter den eingebetteten und werden von mpv vom Server nachgeladen
+        # External text subtitles come after the embedded ones in the list and are loaded from the server by mpv
         sub_files = [jf.subtitle_url(item_id, ms_id, e["index"], e["fmt"]) for e in external_subs(dto)]
         title = dto["Name"]
         if dto["Type"] == "Episode":
@@ -168,24 +215,26 @@ class Api:
 
         jf.report("", item_id, ms_id, psid, resume, runtime)
 
-        # Eingebettet (Windows, Standard); schlägt das fehl, spielt mpv im eigenen Fenster
+        # Embedded (Windows, default); if that fails, mpv plays in its own window
         wid = None
         if self._embed and self._cfg.get("embed", True):
             try:
                 wid = self._embed.show((colors or {}).get("bg"), (colors or {}).get("fg"), (colors or {}).get("back"))
             except Exception:  # noqa: BLE001
                 wid = None
-        fullscreen = {"on": False}
+        start_fs = self._fs  # if the app is already fullscreen, the video starts fullscreen too (bar hidden)
 
         def toggle_fullscreen():
-            fullscreen["on"] = not fullscreen["on"]
-            self._window.toggle_fullscreen()
-            self._embed.set_bar(not fullscreen["on"])
+            self._toggle_fs()
+            self._embed.set_bar(not self._fs)
+
+        if wid is not None and start_fs:
+            self._embed.set_bar(False)
 
         frame = {"img": None}
 
         def grab():
-            """Videobild für den Seitenumschlag zurück; nach dem Beenden von mpv wäre das Fenster schwarz, daher vorher."""
+            """Keep the video frame for the page turn back; after mpv quits the window would be black, so grab it before."""
             if wid is not None:
                 try:
                     frame["img"] = self._embed.snapshot() or frame["img"]
@@ -193,17 +242,15 @@ class Api:
                     pass
 
         def progress(pos):
-            grab()  # Rückfall, wenn mpv von selbst endet (Dateiende)
+            grab()  # fallback when mpv ends by itself (end of file)
             jf.report("Progress", item_id, ms_id, psid, pos, runtime)
 
         def stopped(pos):
             if wid is not None:
-                if fullscreen["on"]:
-                    toggle_fullscreen()
-                self._embed.hide()
+                self._embed.hide()  # fullscreen stays as it currently is
             jf.report("Stopped", item_id, ms_id, psid, pos, runtime)
             if self._window:
-                self._window.evaluate_js(f"window.onPlaybackEnded && window.onPlaybackEnded({json.dumps(frame['img'])})")
+                self._window.evaluate_js(f"window.onPlaybackEnded && window.onPlaybackEnded({json.dumps(frame['img'])}, {json.dumps(self._fs)})")
 
         try:
             m = player.launch(url, title, vid, aid, sid, resume, self._cfg.get("mpv_opts", ""),

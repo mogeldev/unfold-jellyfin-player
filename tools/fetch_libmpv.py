@@ -1,5 +1,5 @@
-"""Lädt libmpv-2.dll (Windows x64) aus dem aktuellen shinchiro/mpv-winbuild-cmake-Release nach lib/.
-Benötigt 7-Zip (7z.exe im PATH oder in C:\\Program Files\\7-Zip), da das Archiv den BCJ2-Filter nutzt."""
+"""Downloads libmpv-2.dll (Windows x64) from the current shinchiro/mpv-winbuild-cmake release into lib/.
+Needs 7-Zip (7z.exe on PATH or in C:\\Program Files\\7-Zip) because the archive uses the BCJ2 filter."""
 import json
 import re
 import shutil
@@ -15,7 +15,7 @@ LIB = Path(__file__).resolve().parent.parent / "lib"
 def find_7z() -> str:
     exe = shutil.which("7z") or next((p for p in (r"C:\Program Files\7-Zip\7z.exe", r"C:\Program Files (x86)\7-Zip\7z.exe") if Path(p).exists()), None)
     if not exe:
-        raise SystemExit("7-Zip nicht gefunden (winget install 7zip.7zip)")
+        raise SystemExit("7-Zip not found (winget install 7zip.7zip)")
     return exe
 
 

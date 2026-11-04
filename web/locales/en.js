@@ -1,7 +1,7 @@
 // English (also the fallback for missing keys in other languages)
 (window.LOCALES ||= {}).en = {
   _name: 'English',
-  libraries: 'Libraries', theme: 'Theme', account: 'Account', settings: 'Settings', language: 'Language',
+  libraries: 'Libraries', fullscreen: 'Fullscreen', theme: 'Theme', scale: 'Text size', account: 'Account', add_account: 'Add account', settings: 'Settings', language: 'Language',
   episodes: 'Episodes', season: 'Season {n}', seasons_one: '{n} season', seasons_other: '{n} seasons',
   search: 'Search', search_placeholder: 'Search…', no_results: 'No results',
   series: 'Series', watched: '✓ watched', min: 'min',

@@ -1,5 +1,5 @@
-"""Prüft Login, Bibliotheken, Items, Details und PlaybackInfo gegen einen echten Server (ohne mpv).
-Aufruf: python tools/smoke_test.py http://192.168.0.4:8096 test   (Passwort wird abgefragt)"""
+"""Checks login, libraries, items, details and PlaybackInfo against a real server (without mpv).
+Usage: python tools/smoke_test.py http://192.168.0.4:8096 test   (the password is prompted)"""
 import getpass
 import sys
 from pathlib import Path

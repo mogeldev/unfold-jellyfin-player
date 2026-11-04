@@ -1,13 +1,13 @@
-"""Minimaler Jellyfin-Client (nur stdlib). Auth-Header und Playback-Reports nach dem Vorbild von JellyCon."""
+"""Minimal Jellyfin client (stdlib only). Auth header and playback reports modelled on JellyCon."""
 import json
 import urllib.error
 import urllib.parse
 import urllib.request
 
-from errors import AppError as JellyfinError  # Fehler tragen einen Code, das Frontend übersetzt ihn
+from errors import AppError as JellyfinError  # errors carry a code, the frontend translates it
 
-TICKS = 10_000_000  # Jellyfin-Ticks pro Sekunde
-CLIENT, VERSION = "Unfold", "0.1"
+TICKS = 10_000_000  # Jellyfin ticks per second
+CLIENT, VERSION = "Unfold", "0.2"
 
 
 def normalize(server: str) -> str:
@@ -47,7 +47,7 @@ class Jellyfin:
         except urllib.error.URLError as e:
             raise JellyfinError("unreachable", reason=str(e.reason)) from e
 
-    # ---- Konto ----
+    # ---- Account ----
     def login(self, user: str, password: str) -> None:
         r = self._req("POST", "/Users/AuthenticateByName", body={"Username": user, "Pw": password})
         self.token = r["AccessToken"]
@@ -60,7 +60,7 @@ class Jellyfin:
             pass
         self.token = None
 
-    # ---- Bibliothek ----
+    # ---- Library ----
     def libraries(self) -> list[dict]:
         r = self._req("GET", "/UserViews", {"userId": self.user_id})
         return r.get("Items", [])
@@ -93,9 +93,9 @@ class Jellyfin:
             return None
         return f"{self.server}/Items/{item['Id']}/Images/Primary?maxHeight={max_height}&tag={tag}&api_key={self.token}"
 
-    # ---- Wiedergabe ----
+    # ---- Playback ----
     def playback_info(self, item_id: str) -> dict:
-        """Liefert PlaySessionId und MediaSources (Direct Play ist erlaubt, mpv spielt fast alles)."""
+        """Returns PlaySessionId and MediaSources (direct play is allowed, mpv plays almost anything)."""
         return self._req("POST", f"/Items/{item_id}/PlaybackInfo", {"UserId": self.user_id}, {"UserId": self.user_id})
 
     def stream_url(self, item_id: str, media_source_id: str, play_session_id: str) -> str:
@@ -109,7 +109,7 @@ class Jellyfin:
 
     def report(self, kind: str, item_id: str, media_source_id: str, play_session_id: str,
                position_s: float = 0, runtime_ticks: int | None = None, paused: bool = False) -> None:
-        """kind: '' (Start), 'Progress' oder 'Stopped'."""
+        """kind: '' (start), 'Progress' or 'Stopped'."""
         body = {"ItemId": item_id, "MediaSourceId": media_source_id, "PlaySessionId": play_session_id,
                 "PositionTicks": int(position_s * TICKS), "PlayMethod": "DirectStream",
                 "CanSeek": True, "IsPaused": paused}
@@ -119,10 +119,10 @@ class Jellyfin:
         try:
             self._req("POST", path, body=body)
         except JellyfinError:
-            pass  # Reporting darf die Wiedergabe nie stören
+            pass  # reporting must never disturb playback
 
 
-# Externe Untertitel: nur Text (Server kann sie umwandeln); Codec -> Format der Stream-URL
+# External subtitles: text only (the server can convert them); codec -> format of the stream URL
 SUB_FORMATS = {"srt": "srt", "subrip": "srt", "ass": "ass", "ssa": "ass", "vtt": "vtt", "webvtt": "vtt"}
 
 
@@ -132,15 +132,15 @@ def _media_streams(dto: dict) -> list[dict]:
 
 
 def external_subs(dto: dict) -> list[dict]:
-    """Externe Textuntertitel in Reihenfolge: [{'index': <Jellyfin-Stream-Index>, 'fmt': 'srt'|'ass'|'vtt'}]."""
+    """External text subtitles in order: [{'index': <Jellyfin stream index>, 'fmt': 'srt'|'ass'|'vtt'}]."""
     return [{"index": s["Index"], "fmt": SUB_FORMATS[(s.get("Codec") or "").lower()]}
             for s in _media_streams(dto)
             if s.get("Type") == "Subtitle" and s.get("IsExternal") and (s.get("Codec") or "").lower() in SUB_FORMATS]
 
 
 def streams(dto: dict) -> tuple[dict, str]:
-    """Namen der Spuren je Typ und die MediaSourceId. Untertitel: erst die eingebetteten (mpv-Reihenfolge), dann die
-    externen (werden von mpv danach nachgeladen); 'Aus' steht immer am Ende der Untertitel-Liste."""
+    """Track names per type and the MediaSourceId. Subtitles: embedded ones first (mpv order), then the
+    external ones (loaded by mpv afterwards); 'Off' is always the last subtitle entry."""
     src = (dto.get("MediaSources") or [{}])[0]
     out = {"v": [], "a": [], "s": []}
     ext = []
@@ -154,7 +154,7 @@ def streams(dto: dict) -> tuple[dict, str]:
         elif t == "Subtitle":
             if not s.get("IsExternal"):
                 out["s"].append(name)
-            elif (s.get("Codec") or "").lower() in SUB_FORMATS:  # gleiche Auswahl und Reihenfolge wie external_subs()
+            elif (s.get("Codec") or "").lower() in SUB_FORMATS:  # same selection and order as external_subs()
                 ext.append(name)
     out["s"] += ext
     out["s"].append("Aus")

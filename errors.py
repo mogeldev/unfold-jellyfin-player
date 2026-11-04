@@ -1,4 +1,4 @@
-"""Fehler mit Code statt Text: das Frontend übersetzt ('err_<code>' in web/locales/*.js), params füllen die Platzhalter."""
+"""Errors carry a code instead of text: the frontend translates it ('err_<code>' in web/locales/*.js), params fill the placeholders."""
 
 
 class AppError(Exception):

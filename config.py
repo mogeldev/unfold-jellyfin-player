@@ -1,4 +1,4 @@
-"""Einstellungen und Token. Config-Datei: %APPDATA%\\jfplayer bzw. ~/.config/jfplayer. Token im Keyring, falls vorhanden."""
+"""Settings and tokens. Config file: %APPDATA%\\unfold or ~/.config/unfold. Tokens go to the keyring if available."""
 import json
 import os
 import uuid
@@ -10,7 +10,7 @@ except ImportError:
     keyring = None
 
 SERVICE = "unfold"
-LEGACY_SERVICE = "jfplayer"  # alter Name der App: vorhandene Anmeldung weiterverwenden
+LEGACY_SERVICE = "jfplayer"  # old app name: keep existing sign-ins working
 
 
 def _dir() -> Path:
@@ -49,7 +49,7 @@ def save(cfg: dict) -> None:
 
 
 def set_token(cfg: dict, token: str) -> None:
-    """Token in den Keyring; ohne Keyring (oder bei Fehler) Fallback auf die Config-Datei."""
+    """Store the token in the keyring; without a keyring (or on error) fall back to the config file."""
     if keyring:
         try:
             keyring.set_password(SERVICE, f"{cfg['user']}@{cfg['server']}", token)
@@ -67,7 +67,7 @@ def get_token(cfg: dict) -> str | None:
             t = keyring.get_password(SERVICE, account)
             if t:
                 return t
-            t = keyring.get_password(LEGACY_SERVICE, account)  # Token aus der Zeit vor der Umbenennung übernehmen
+            t = keyring.get_password(LEGACY_SERVICE, account)  # adopt tokens from before the rename
             if t:
                 keyring.set_password(SERVICE, account, t)
                 return t

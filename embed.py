@@ -1,13 +1,13 @@
-"""Einbetten von mpv ins App-Fenster (nur Windows): ein WinForms-Panel liegt während der Wiedergabe über der Weboberfläche
-(oben eine schmale Leiste mit Zurück-Button, darunter das Videofeld), dessen Handle wird mpv als `wid` übergeben.
-pywebview-Calls kommen aus Worker-Threads, daher alles per Invoke im UI-Thread."""
+"""Embeds mpv in the app window (Windows only): a WinForms panel covers the web UI during playback
+(a slim bar with a back button on top, the video area below); its handle is passed to mpv as `wid`.
+pywebview calls come from worker threads, so everything goes through Invoke on the UI thread."""
 import re
 import threading
 
 
 def enable_input(wid: int, timeout: float = 4.0) -> bool:
-    """mpv legt sein eingebettetes Fenster deaktiviert (WS_DISABLED) an, dann kommen weder Maus (OSC) noch Tasten an.
-    Aktiviert es und gibt ihm den Fokus. Wartet kurz, bis mpv das Kindfenster erzeugt hat."""
+    """mpv creates its embedded window disabled (WS_DISABLED), so neither mouse (OSC) nor keys arrive.
+    Enables it and gives it focus. Waits briefly until mpv has created the child window."""
     import ctypes
     import time
     from ctypes import wintypes
@@ -22,7 +22,7 @@ def enable_input(wid: int, timeout: float = 4.0) -> bool:
             u.EnableWindow(k, True)
             me = ctypes.windll.kernel32.GetCurrentThreadId()
             there = u.GetWindowThreadProcessId(k, None)
-            u.AttachThreadInput(me, there, True)  # SetFocus geht nur innerhalb der eigenen Input-Queue
+            u.AttachThreadInput(me, there, True)  # SetFocus only works within the own input queue
             u.SetFocus(k)
             u.AttachThreadInput(me, there, False)
             return True
@@ -31,7 +31,7 @@ def enable_input(wid: int, timeout: float = 4.0) -> bool:
 
 
 def _color(s: str | None, default: tuple):
-    """'rgb(1, 2, 3)' oder '#rrggbb' -> System.Drawing.Color"""
+    """'rgb(1, 2, 3)' or '#rrggbb' -> System.Drawing.Color"""
     from System.Drawing import Color
     rgb = default
     if s:
@@ -52,7 +52,7 @@ class Embed:
         self._video = None
         self._bar = None
         self._btn = None
-        self.on_back = None  # wird von main.py je Wiedergabe gesetzt (beendet mpv)
+        self.on_back = None  # set by main.py for each playback (quits mpv)
 
     def _ui(self, fn):
         from System import Action
@@ -73,7 +73,7 @@ class Embed:
         bar.Dock = DockStyle.Top
         bar.Height = 34
         btn = Button()
-        btn.Text = "←  Zurück"
+        btn.Text = "←  Back"
         btn.Dock = DockStyle.Left
         btn.Width = 130
         btn.FlatStyle = FlatStyle.Flat
@@ -81,14 +81,14 @@ class Embed:
         btn.Cursor = Cursors.Hand
         btn.Click += EventHandler(lambda _s, _e: self.on_back and threading.Thread(target=self.on_back, daemon=True).start())
         bar.Controls.Add(btn)
-        host.Controls.Add(video)  # erst Fill, dann Top: so wird die Leiste zuerst angedockt
+        host.Controls.Add(video)  # Fill first, then Top: this docks the bar first
         host.Controls.Add(bar)
         video.BringToFront()
         self._w.native.Controls.Add(host)
         self._host, self._video, self._bar, self._btn = host, video, bar, btn
 
     def show(self, bg: str | None = None, fg: str | None = None, back: str | None = None) -> int:
-        """Panel anzeigen (Farben und Beschriftung der Leiste vom Frontend) und das HWND des Videofelds zurückgeben."""
+        """Show the panel (bar colours and label come from the frontend) and return the HWND of the video area."""
         def f():
             if self._host is None:
                 self._build()
@@ -104,8 +104,8 @@ class Embed:
         return self._ui(f)
 
     def snapshot(self) -> str | None:
-        """Bild des Fensterinhalts (inkl. WebView) als data-URL: Vorlage für den Seitenumschlag im Frontend.
-        None, wenn das Fenster nicht vorn liegt (der Bildschirmabzug würde fremde Fenster mitnehmen)."""
+        """Image of the window contents (incl. WebView) as a data URL: template for the page turn in the frontend.
+        None if the window is not in the foreground (the screen grab would include other windows)."""
         def f():
             import ctypes
             from System import Convert
@@ -121,20 +121,20 @@ class Embed:
             g.CopyFromScreen(n.PointToScreen(Point(0, 0)), Point(0, 0), size)
             g.Dispose()
             ms = MemoryStream()
-            bmp.Save(ms, ImageFormat.Jpeg)  # JPEG: viel schneller und kleiner als PNG, reicht für den Umschlag
+            bmp.Save(ms, ImageFormat.Jpeg)  # JPEG: much faster and smaller than PNG, good enough for the page turn
             bmp.Dispose()
             return "data:image/jpeg;base64," + Convert.ToBase64String(ms.ToArray())
         return self._ui(f)
 
     def set_icon(self, path) -> None:
-        """Fenstericon (Titelleiste) setzen; als exe kommt es sonst aus der Programmdatei, beim Start per python wäre es das Python-Symbol."""
+        """Set the window icon (title bar); as an exe it comes from the program file, started via python it would be the Python icon."""
         def f():
             from System.Drawing import Icon
             self._w.native.Icon = Icon(str(path))
         self._ui(f)
 
     def set_bar(self, visible: bool) -> None:
-        """Leiste ausblenden (Vollbild) bzw. wieder einblenden."""
+        """Hide the bar (fullscreen) or show it again."""
         if self._bar is not None:
             self._ui(lambda: setattr(self._bar, "Visible", visible))
 

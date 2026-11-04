@@ -1,6 +1,6 @@
-// Übersetzungen: jede Sprache ist eine Datei locales/<code>.js, die sich in window.LOCALES einträgt.
-// Neue Sprache: locales/xx.js anlegen (Schlüssel wie en.js, dazu _name) und in index.html per <script> einbinden.
-// Fehlende Schlüssel fallen auf Englisch zurück. Mehrzahl: <key>_one / <key>_other usw. (Intl.PluralRules), Aufruf t('key', {n}).
+// Translations: every language is a file locales/<code>.js that registers itself in window.LOCALES.
+// New language: create locales/xx.js (keys as in en.js, plus _name) and include it in index.html via <script>.
+// Missing keys fall back to English. Plurals: <key>_one / <key>_other etc. (Intl.PluralRules), call t('key', {n}).
 (() => {
   const L = (window.LOCALES ||= {});
   let lang = 'en';
