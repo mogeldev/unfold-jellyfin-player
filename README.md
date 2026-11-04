@@ -11,7 +11,13 @@ A lean desktop player for [Jellyfin](https://jellyfin.org). It only shows your l
 
 Windows is the main platform (WebView2, mpv embedded in the window). Linux runs with a separate mpv window but is untested.
 
-## Run
+## Download (Windows 10/11, 64-bit)
+
+From [Releases](https://github.com/mogeldev/unfold-jellyfin-player/releases/latest):
+- `Unfold-Setup-<version>.exe`: installer (per user, no admin rights)
+- `Unfold-<version>-portable.zip`: unzip anywhere and start `Unfold\Unfold.exe`; settings are kept in `%APPDATA%\unfold`
+
+## Run from source
 
 ```
 pip install -r requirements.txt
@@ -21,14 +27,14 @@ python main.py                  # JF_DEBUG=1 for dev tools
 
 Python 3.10+. On Linux you need `libmpv2` / `mpv-libs` from your package manager.
 
-## Build the installer (Windows)
+## Build the installer and the portable zip (Windows)
 
 ```
 winget install JRSoftware.InnoSetup
-.\tools\make_installer.ps1      # dist\Unfold\Unfold.exe + installer\out\Unfold-Setup-<version>.exe
+.\tools\make_installer.ps1      # installer\out\Unfold-Setup-<version>.exe + Unfold-<version>-portable.zip
 ```
 
 ## More
 
-Design, server calls and known limitations: [ARCHITECTURE.md](ARCHITECTURE.md) (in German).
+Design, server calls and known limitations: [ARCHITECTURE.md](ARCHITECTURE.md).
 The password is never stored, only the token (keyring, otherwise the config file).
