@@ -61,12 +61,19 @@ def launch(url: str, title: str, vid: int | None, aid: int | None, sid: int | st
                 m.sid = sid
 
     if wid is not None:
-        # embedded there is no window X: Esc quits and returns to the library (grab the last frame first)
+        # embedded there is no window X: Esc quits and returns to the library. on_quit (grab the last frame,
+        # wait for the frontend) may take a moment: run it off the mpv event thread, once.
+        quitting = []
+
+        def _quit():
+            if on_quit:
+                on_quit()
+            m.command("quit")
+
         def _esc(state="d", *_a):
-            if str(state)[:1] in ("d", "p"):
-                if on_quit:
-                    on_quit()
-                m.command("quit")
+            if str(state)[:1] in ("d", "p") and not quitting:
+                quitting.append(1)
+                threading.Thread(target=_quit, daemon=True).start()
         m.register_key_binding("ESC", _esc)
         if on_fullscreen:
             # Fullscreen (key f, bar button, double click) would only affect the mpv child window:

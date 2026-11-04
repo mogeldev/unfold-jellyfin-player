@@ -10,5 +10,5 @@ if ($LASTEXITCODE) { throw "pip failed" }
     --icon assets\icon.ico --add-data "assets;assets" --add-data "web;web" --add-binary "lib\libmpv-2.dll;lib" `
     --hidden-import keyring.backends.Windows `
     main.py
-if ($LASTEXITCODE) { throw "PyInstaller fehlgeschlagen" }
+if ($LASTEXITCODE) { throw "PyInstaller failed" }
 Write-Host "Done: dist\Unfold\Unfold.exe"

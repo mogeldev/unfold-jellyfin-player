@@ -212,16 +212,22 @@
     };
     await flip.anims[0].finished;
   }
-  // frame: last video frame from mpv; at the start it covers the leaf back and the right side so the transition begins seamlessly
-  async function pageBack(frame) {
-    if (!flip) return;
-    const f = flip; flip = null;
-    if (frame) try {
+  // frame: last video frame from mpv; it covers the leaf back and the right side so the transition begins seamlessly.
+  // Back/Esc: the backend calls this before mpv quits and waits until the frame is decoded and in place.
+  window.prepareBack = async frame => {
+    if (!flip || flip.framed || !frame) return;
+    try {
       const img = new Image(); img.src = frame; await img.decode();
-      const set = (sel, pos) => Object.assign(f.el.querySelector(sel).style,
+      const set = (sel, pos) => Object.assign(flip.el.querySelector(sel).style,
         { backgroundImage: `url(${frame})`, backgroundSize: '200% 100%', backgroundPosition: pos });
       set('.fr', '100% 0'); set('.back', '0 0');
+      flip.framed = true;
     } catch { /* broken image: paper colour instead of video, the cover must go away anyway */ }
+  };
+  async function pageBack(frame) {
+    if (!flip) return;
+    await window.prepareBack(frame); // end of file: the frame only arrives now
+    const f = flip; flip = null;
     f.anims.forEach(a => a.reverse());
     await f.anims[0].finished;
     f.el.remove();

@@ -20,7 +20,7 @@ Letter bar (0-9, A–Z, … if needed) at the top of column 2: a click filters t
 
 Animations (motif: book):
 - New column: its content opens like a page around the left edge (`.col.unfolding`, several one after another). Choosing another entry unfolds columns 3–5 again; going back folds the removed columns shut (`foldAway()`).
-- Opening/leaving mpv (embedded only): `Embed.snapshot()` returns a screen-grab image of the window (`Api.snapshot`). `pageOut()`/`pageBack()` in `app.js` turn the right half as a leaf around the middle. On the way back, the last video frame (grabbed before mpv quits, otherwise the window is black; fallback: the frame from the last progress report) lies on the back of the leaf and on the right side at the start. Skipped with "reduce motion".
+- Opening/leaving mpv (embedded only): `Embed.snapshot()` returns a screen-grab image of the window (`Api.snapshot`). `pageOut()`/`pageBack()` in `app.js` turn the right half as a leaf around the middle. On the way back, the last video frame lies on the back of the leaf and on the right side at the start: Back/Esc grabs it while mpv still shows it, the frontend decodes it and puts it in place (`window.prepareBack`), the backend waits for that (max 2 s) and only then quits mpv. At the end of a file the frame comes from the last progress report in the final 20 s. Skipped with "reduce motion".
 
 ## Tech: Python + pywebview
 

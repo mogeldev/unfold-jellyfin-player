@@ -256,6 +256,18 @@ class Api:
                 except Exception:  # noqa: BLE001
                     pass
 
+        def before_quit():
+            """Back/Esc: grab the current frame and wait until the frontend has put it on the page (max 2 s);
+            only then mpv quits, so the page turn back starts with the frame already in place."""
+            grab()
+            if frame["img"] and self._window:
+                ready = threading.Event()
+                try:
+                    self._window.evaluate_js(f"window.prepareBack({json.dumps(frame['img'])})", lambda _r: ready.set())
+                    ready.wait(2)
+                except Exception:  # noqa: BLE001 - never block quitting
+                    pass
+
         def progress(pos):
             if runtime and pos > runtime / TICKS - 20:
                 grab()  # fallback when mpv ends by itself (end of file): only needed near the end
@@ -272,9 +284,9 @@ class Api:
         try:
             m = player.launch(url, title, vid, aid, sid, resume, self._cfg.get("mpv_opts", ""),
                               progress, stopped,
-                              wid=wid, on_fullscreen=toggle_fullscreen, sub_files=sub_files, on_quit=grab)
+                              wid=wid, on_fullscreen=toggle_fullscreen, sub_files=sub_files, on_quit=before_quit)
             if wid is not None:
-                self._embed.on_back = lambda: (grab(), m.command("quit"))
+                self._embed.on_back = lambda: (before_quit(), m.command("quit"))
                 threading.Thread(target=self._embed.enable_input, args=(wid,), daemon=True).start()
         except Exception:
             if wid is not None:
