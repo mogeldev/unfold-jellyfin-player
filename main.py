@@ -45,10 +45,12 @@ class Api:
         self._embed = None
         self._fs, self._bg = False, None  # fullscreen on/off, theme colour of the title bar
         self._jf = None
+        self._play_lock = threading.Lock()  # one player at a time (e.g. Enter pressed twice while mpv starts)
         accs = self._cfg.setdefault("accounts", [])
-        if not accs and self._cfg.get("server") and self._cfg.get("user_id"):  # config from the time of a single account
-            accs.append({"server": self._cfg["server"], "user": self._cfg["user"], "user_id": self._cfg["user_id"],
-                         "device_id": self._cfg["device_id"], **({"token": self._cfg.pop("token")} if self._cfg.get("token") else {})})
+        if not accs and self._cfg.get("user_id"):  # config from before 0.2 (one account): convert it once
+            old = {k: self._cfg.pop(k) for k in ("server", "user", "user_id", "device_id", "token") if k in self._cfg}
+            accs.append({"device_id": uuid.uuid4().hex, **old})
+            config.save(self._cfg)
         self._connect(self._cfg.get("active", 0))
 
     def _connect(self, i: int) -> None:
@@ -59,7 +61,7 @@ class Api:
         if not 0 <= i < len(accs):
             return
         a = accs[i]
-        self._cfg.update(active=i, server=a["server"], user=a["user"], user_id=a["user_id"])
+        self._cfg.update(active=i, server=a["server"], user=a["user"])
         token = config.get_token(a)
         if token:
             self._jf = Jellyfin(a["server"], a["device_id"], token, a["user_id"])
@@ -86,7 +88,8 @@ class Api:
     def login(self, server, user, password):
         """Sign in a new account and activate it; the same account (server + user) is only updated."""
         accs = self._cfg["accounts"]
-        i = next((n for n, a in enumerate(accs) if a["server"] == normalize(server) and a["user"] == user), len(accs))
+        same = lambda a: a["server"] == normalize(server) and a["user"].lower() == user.lower()  # noqa: E731 - Jellyfin user names ignore case
+        i = next((n for n, a in enumerate(accs) if same(a)), len(accs))
         jf = Jellyfin(server, accs[i]["device_id"] if i < len(accs) else uuid.uuid4().hex)
         jf.login(user, password)
         acc = {"server": jf.server, "user": user, "user_id": jf.user_id, "device_id": jf.device_id}
@@ -108,7 +111,6 @@ class Api:
             self._jf.logout()
         if 0 <= i < len(accs):
             config.clear_token(accs.pop(i))
-        self._cfg.pop("user_id", None)
         self._connect(0)
         config.save(self._cfg)
 
@@ -188,12 +190,27 @@ class Api:
             n = e.get("ParentIndexNumber") or 0
             seasons.setdefault(n, []).append({
                 "id": e["Id"], "n": e.get("IndexNumber") or 0, "t": e["Name"], "min": minutes(e),
-                "seen": bool((e.get("UserData") or {}).get("Played")), "st": streams(e)[0]})
+                "seen": bool((e.get("UserData") or {}).get("Played"))})  # tracks: tracks() for the selected episode
         return {**base, "type": "series",
                 "seasons": [{"n": n, "eps": sorted(eps, key=lambda x: x["n"])} for n, eps in sorted(seasons.items())]}
 
     @rpc
+    def tracks(self, item_id):
+        """Track names of one episode (loaded when it is selected, so long series stay fast)."""
+        return streams(self._need().detail(item_id))[0]
+
+    @rpc
     def play(self, item_id, v, a, s, colors=None):
+        if not self._play_lock.acquire(blocking=False):  # already playing or starting: ignore
+            return {}
+        try:
+            return self._play(item_id, v, a, s, colors)
+        except BaseException:
+            self._play_lock.release()
+            raise
+
+    def _play(self, item_id, v, a, s, colors):
+        """Starts mpv; the play lock is released in stopped() (or by play() if this raises before mpv runs)."""
         jf = self._need()
         dto = jf.detail(item_id)
         st, ms_id = streams(dto)
@@ -212,8 +229,6 @@ class Api:
         title = dto["Name"]
         if dto["Type"] == "Episode":
             title = f"{dto.get('SeriesName', '')} S{dto.get('ParentIndexNumber', 0)}E{dto.get('IndexNumber', 0)} {title}"
-
-        jf.report("", item_id, ms_id, psid, resume, runtime)
 
         # Embedded (Windows, default); if that fails, mpv plays in its own window
         wid = None
@@ -242,12 +257,14 @@ class Api:
                     pass
 
         def progress(pos):
-            grab()  # fallback when mpv ends by itself (end of file)
+            if runtime and pos > runtime / TICKS - 20:
+                grab()  # fallback when mpv ends by itself (end of file): only needed near the end
             jf.report("Progress", item_id, ms_id, psid, pos, runtime)
 
         def stopped(pos):
             if wid is not None:
                 self._embed.hide()  # fullscreen stays as it currently is
+            self._play_lock.release()
             jf.report("Stopped", item_id, ms_id, psid, pos, runtime)
             if self._window:
                 self._window.evaluate_js(f"window.onPlaybackEnded && window.onPlaybackEnded({json.dumps(frame['img'])}, {json.dumps(self._fs)})")
@@ -263,6 +280,7 @@ class Api:
             if wid is not None:
                 self._embed.hide()
             raise
+        jf.report("", item_id, ms_id, psid, resume, runtime)  # only once mpv runs, else the server keeps a ghost session
         return {}
 
 

@@ -3,10 +3,10 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hue = s => [...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 
-  const raw = await new Promise(res => {
+  // Backend: pywebview in the app; the browser preview opens index.html#mock (web/mock.js)
+  const raw = location.hash === '#mock' ? window.MOCK : await new Promise(res => {
     if (window.pywebview && window.pywebview.api) return res(window.pywebview.api);
     window.addEventListener('pywebviewready', () => res(window.pywebview.api));
-    setTimeout(() => { if (!window.pywebview) res(window.MOCK); }, 1200);
   });
   const t = (k, v) => I18N.t(k, v);
   const APP = 'Unfold – Jellyfin Player';
@@ -142,7 +142,9 @@
       for (let e = 0; e < it.seasons[s].eps.length; e++)
         if (!it.seasons[s].eps[e].seen) { si = s; ei = e; break outer; }
   }
-  const selectItem = guard(async i => { it = await call('detail', items[i].id); pick(); render(); });
+  // Episodes come without tracks (long series stay fast): load them for the selected episode
+  const ensureTracks = async () => { const c = target(); if (!c.st) c.st = await call('tracks', c.id); };
+  const selectItem = guard(async i => { it = await call('detail', items[i].id); pick(); await ensureTracks(); render(); });
   const selectLib = guard(async i => {
     searchOn = false; query = ''; searchToken++; letter = null;
     lib = i; items = await call('items', libs[i].id); it = null;
@@ -233,7 +235,7 @@
     if (!it) return back;
     const keep = { si, ei, sel };
     const [d, list] = await Promise.all([call('detail', it.id), listItems(), back]);
-    it = d; items = list; ({ si, ei, sel } = keep); render();
+    it = d; items = list; ({ si, ei, sel } = keep); await ensureTracks(); render();
   });
 
   // ---- Render ----
@@ -294,7 +296,7 @@
         `<a class="item${a === si && b === ei ? ' on' : ''}${e.seen ? ' seen' : ''}" data-ep="${a}.${b}"><span>${e.seen ? '✓' : '○'} ${esc(e.n)}. ${esc(e.t)}</span><span class="meta">${esc(e.min)} ${t('min')}</span></a>`).join('')).join('');
     const title = it.type === 'movie' ? it.name : `S${it.seasons[si].n}E${cur.n} · ${cur.t}`;
     // 'subs_off': the last subtitle entry is always “Off”, the text comes from the language file
-    const list = (k, label) => `<div class="h">${label}</div>` + cur.st[k].map((n, i, arr) =>
+    const list = (k, label) => `<div class="h">${label}</div>` + (cur.st?.[k] || []).map((n, i, arr) =>
       `<a class="item${sel[k] === i ? ' on' : ''}" data-st="${k}.${i}"><span>${esc(k === 's' && i === arr.length - 1 ? t('subs_off') : n)}</span><span class="mark">${sel[k] === i ? '●' : ''}</span></a>`).join('');
     const c5 = `<div class="d"><h1>${esc(title)}</h1><div class="meta">${it.type === 'series' ? esc(it.name) + ' · ' : ''}${esc(cur.min)} ${t('min')}</div></div>` +
       list('v', t('video')) + list('a', t('audio')) + list('s', t('subtitles')) +
@@ -444,7 +446,7 @@
     else if ((x = q('sc'))) setScale(scale + +x.dataset.sc);
     else if ((x = q('lib'))) return selectLib(+x.dataset.lib);
     else if ((x = q('item'))) return selectItem(+x.dataset.item);
-    else if ((x = q('ep'))) { [si, ei] = x.dataset.ep.split('.').map(Number); resetSel(); }
+    else if ((x = q('ep'))) { [si, ei] = x.dataset.ep.split('.').map(Number); resetSel(); await ensureTracks(); }
     else if ((x = q('st'))) { const [k, i] = x.dataset.st.split('.'); sel[k] = +i; }
     else if ((x = q('act'))) {
       if (x.dataset.act === 'search') { openSearch(); return; }

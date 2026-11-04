@@ -1,14 +1,14 @@
 // Mock backend for the browser preview without pywebview. Same interface as main.py (Api), answers as {ok, data|error}.
 (() => {
   const A = ['Deutsch · EAC3 5.1', 'English · TrueHD 7.1', 'English · AAC 2.0'];
-  const S = ['Deutsch · SRT', 'English · SRT', 'English · SDH', 'Aus'];
+  const S = ['Deutsch · SRT', 'English · SRT', 'English · SDH', 'Off'];
   const st = h => ({ v: [h ? 'HEVC 2160p · HDR10' : 'H.264 1080p', 'H.264 1080p'], a: A, s: S });
   const OV = 'Short synopsis from the Jellyfin metadata. This is where the description text of the movie or series goes.';
   const mv = (name, year, min, seen) => ({ id: 'm:' + name, type: 'movie', name, year, min, ov: OV, seen: !!seen, st: st(year > 2010) });
   const sr = (name, year, seasons) => ({
     id: 's:' + name, type: 'series', name, year, ov: OV, seen: false,
     seasons: seasons.map(([n, min, seen], a) => ({
-      n: a + 1, eps: Array.from({ length: n }, (_, k) => ({ id: `e:${name}:${a}:${k}`, n: k + 1, t: `Folge ${k + 1}`, min, seen: k < seen, st: st(year > 2010) }))
+      n: a + 1, eps: Array.from({ length: n }, (_, k) => ({ id: `e:${name}:${a}:${k}`, n: k + 1, t: `Episode ${k + 1}`, min, seen: k < seen }))
     }))
   });
   const LIBS = [
@@ -29,6 +29,7 @@
     search: q => LIBS.flatMap(l => l.items).filter(x => x.name.toLowerCase().includes(q.toLowerCase()))
       .map(({ id, name, year, type, seen }) => ({ id, name, year, type, seen })),
     detail: id => LIBS.flatMap(l => l.items).find(x => x.id === id),
+    tracks: () => st(true), // episodes come without tracks, like from main.py
     play: (id, v, a, s) => ({ cmd: `mpv --vid=${v + 1} --aid=${a + 1} --sid=${s + 1} <stream-url>` }),
   };
   window.MOCK = Object.fromEntries(Object.entries(impl).map(([k, f]) => [k, async (...a) => ({ ok: true, data: f(...a) })]));

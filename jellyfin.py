@@ -83,8 +83,7 @@ class Jellyfin:
 
     def episodes(self, series_id: str) -> list[dict]:
         r = self._req("GET", f"/Shows/{series_id}/Episodes", {
-            "userId": self.user_id, "IsMissing": "false", "IsVirtualUnAired": "false",
-            "Fields": "MediaSources,MediaStreams,Overview"})
+            "userId": self.user_id, "IsMissing": "false", "IsVirtualUnAired": "false"})
         return r.get("Items", [])
 
     def poster_url(self, item: dict, max_height: int = 500) -> str | None:
@@ -157,7 +156,7 @@ def streams(dto: dict) -> tuple[dict, str]:
             elif (s.get("Codec") or "").lower() in SUB_FORMATS:  # same selection and order as external_subs()
                 ext.append(name)
     out["s"] += ext
-    out["s"].append("Aus")
+    out["s"].append("Off")  # the frontend shows its own translation (subs_off)
     return out, src.get("Id") or dto["Id"]
 
 

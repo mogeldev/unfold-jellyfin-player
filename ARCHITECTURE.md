@@ -31,7 +31,7 @@ web/  (HTML/CSS/JS)  ──window.pywebview.api──►  main.py  Api (rpc → 
                                                   └─ config.py    config.json + keyring
 ```
 
-- `web/mock.js` replaces the backend in a normal browser (preview without a server).
+- `web/mock.js` replaces the backend in a normal browser: open `index.html#mock` (preview without a server). Without `#mock` the page waits for pywebview.
 - Platforms: Windows (WebView2), Linux (GTK/WebKit or Qt).
 - Embedded (Windows): `embed.py` puts a WinForms panel over the web UI and mpv renders into it via `wid`. A bar with "← Back" on top (quits mpv, theme colours, hidden in fullscreen); Esc quits as well, `f` = fullscreen of the app window; fallback/setting: own mpv window. mpv creates the embedded window disabled (WS_DISABLED): `enable_input()` enables it and sets the focus, otherwise neither mouse (OSC) nor keys work. Linux: own window.
 - Fullscreen (library switch, F11, `f` while playing) toggles the app window; on Windows 11 `chrome.set_fullscreen_frame` removes the rounded corners and the border. Staying in or leaving fullscreen is carried over into the library; leaving it refits the window width to the columns.
@@ -47,7 +47,7 @@ web/  (HTML/CSS/JS)  ──window.pywebview.api──►  main.py  Api (rpc → 
 | Contents | `GET /Items?ParentId&Recursive&IncludeItemTypes=Movie,Series&SortBy=SortName` |
 | Search | `GET /Items?searchTerm&Recursive&IncludeItemTypes=Movie,Series&Limit=100` |
 | Details | `GET /Users/{uid}/Items/{id}` (incl. `MediaSources[0].MediaStreams`, `UserData`) |
-| Episodes | `GET /Shows/{id}/Episodes?userId&IsMissing=false&IsVirtualUnAired=false&Fields=MediaSources,MediaStreams,Overview` |
+| Episodes | `GET /Shows/{id}/Episodes?userId&IsMissing=false&IsVirtualUnAired=false` (without tracks; the selected episode's tracks come from its Details call, so long series stay fast) |
 | Poster | `/Items/{id}/Images/Primary?maxHeight&tag` (only if `ImageTags.Primary`) |
 | Start | `POST /Items/{id}/PlaybackInfo` → `PlaySessionId` |
 | Stream | `/Videos/{id}/stream?static=true&MediaSourceId&PlaySessionId&api_key` |
@@ -56,8 +56,10 @@ web/  (HTML/CSS/JS)  ──window.pywebview.api──►  main.py  Api (rpc → 
 "Watched" is set by the server from the Stopped report; afterwards the frontend reloads (`onPlaybackEnded`). Resume: `UserData.PlaybackPositionTicks` → `mpv --start`.
 
 ## Accounts
-- Several accounts: `accounts` in the config (server, user, user_id, own `device_id`, token in the keyring per `user@server`), `active` = the active account. "Account" dialog: click an account to switch, "Add account", "Sign out" (removes the active account). Every account has its own device_id so sign-ins on the same server do not sign each other out. Old single-account configs are migrated on start.
+- Several accounts: `accounts` in the config (server, user, user_id, own `device_id`, token in the keyring per `user@server`), `active` = the active account. "Account" dialog: click an account to switch, "Add account", "Sign out" (removes the active account). Every account has its own device_id so sign-ins on the same server do not sign each other out. User names are matched case-insensitively (like Jellyfin). Single-account configs from before 0.2 are converted once on start.
 - The password is never stored, only the token (keyring, otherwise the config file with 0600).
+- The config is written to a temp file and swapped in (no half-written file after a crash); a file that cannot be parsed is kept as `config.json.bad`.
+- Playback: one player at a time (a second Play while mpv runs or starts is ignored). The start report goes to the server only once mpv is running.
 
 ## Known limitations
 - Subtitles: embedded ones first, then external text subtitles (srt/ass/vtt, loaded by mpv from the server via `/Videos/{id}/{source}/Subtitles/{index}/Stream.{fmt}`; mpv numbers them afterwards). External image subtitles (e.g. `.sup`) are not offered.

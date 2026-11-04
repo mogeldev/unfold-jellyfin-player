@@ -11,10 +11,10 @@ from jellyfin import Jellyfin, streams  # noqa: E402
 def main():
     server, user = sys.argv[1], sys.argv[2]
     jf = Jellyfin(server, "smoke-test")
-    jf.login(user, getpass.getpass("Passwort: "))
-    print("Login OK, User", jf.user_id)
+    jf.login(user, getpass.getpass("Password: "))
+    print("Login OK, user", jf.user_id)
     libs = jf.libraries()
-    print("Bibliotheken:", [(v["Name"], v.get("CollectionType")) for v in libs])
+    print("Libraries:", [(v["Name"], v.get("CollectionType")) for v in libs])
     for v in libs:
         items = jf.items(v["Id"])
         print(f"- {v['Name']}: {len(items)} Items", [i["Name"] for i in items[:3]])
@@ -24,10 +24,10 @@ def main():
         d = jf.detail(first["Id"])
         if d["Type"] == "Series":
             eps = jf.episodes(first["Id"])
-            print("  Serie", d["Name"], "Episoden:", len(eps))
-            d = eps[0] if eps else d
+            print("  Series", d["Name"], "episodes:", len(eps))
+            d = jf.detail(eps[0]["Id"]) if eps else d  # episode lists come without tracks
         st, ms = streams(d)
-        print("  Spuren:", st)
+        print("  Tracks:", st)
         if d["Type"] != "Series":
             info = jf.playback_info(d["Id"])
             print("  PlaybackInfo: PlaySessionId", bool(info.get("PlaySessionId")), "| Stream:", jf.stream_url(d["Id"], ms, info["PlaySessionId"]).split("api_key")[0] + "api_key=…")
