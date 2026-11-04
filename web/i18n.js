@@ -1,10 +1,15 @@
 // Translations: every language is a file locales/<code>.js that registers itself in window.LOCALES.
 // New language: create locales/xx.js (keys as in en.js, plus _name) and include it in index.html via <script>.
+// Regional variants use the full code, e.g. locales/pt-BR.js registering LOCALES['pt-BR']; a code without its own file falls back to the base language (zh-TW → zh).
 // Missing keys fall back to English. Plurals: <key>_one / <key>_other etc. (Intl.PluralRules), call t('key', {n}).
 (() => {
   const L = (window.LOCALES ||= {});
   let lang = 'en';
-  const pick = code => { code = String(code || '').slice(0, 2).toLowerCase(); return L[code] ? code : 'en'; };
+  const pick = code => {
+    code = String(code || '').toLowerCase();
+    const has = c => Object.keys(L).find(k => k.toLowerCase() === c);
+    return has(code) || has(code.split('-')[0]) || 'en';
+  };
   const find = (code, key, n) => {
     const d = L[code] || {};
     if (n !== undefined) {

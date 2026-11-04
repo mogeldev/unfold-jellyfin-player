@@ -81,7 +81,7 @@ class Api:
 
     @rpc
     def set_lang(self, lang):
-        self._cfg["lang"] = str(lang)[:5]
+        self._cfg["lang"] = str(lang)[:16]
         config.save(self._cfg)
 
     @rpc
