@@ -5,7 +5,7 @@ A lean desktop player for [Jellyfin](https://jellyfin.org). It only shows your l
 - 5 columns: libraries → content → details → episodes → tracks / play
 - Search (`/`), A–Z letter bar, full keyboard control
 - Themes: terminal, nord, blueprint
-- Languages: English, German, French, Spanish, Simplified Chinese. Translations are welcome: copy `web/locales/en.js`, translate the values and add a `<script>` line in `web/index.html`
+- Languages: English, German, French, Spanish, Portuguese (Portugal and Brazil), Chinese (Simplified and Traditional). Translations are welcome: copy `web/locales/en.js`, translate the values and add a `<script>` line in `web/index.html`
 - Watched state and progress are reported back to the server; playback resumes where you left off
 - Book-style page-turn animations when opening columns and when starting or leaving playback
 

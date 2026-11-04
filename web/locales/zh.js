@@ -1,4 +1,4 @@
-// 简体中文 (Simplified Chinese; also used for zh-TW / zh-HK until a Traditional file exists)
+// 简体中文 (Simplified Chinese; Traditional is zh-Hant.js)
 (window.LOCALES ||= {}).zh = {
   _name: '简体中文',
   libraries: '媒体库', fullscreen: '全屏', theme: '主题', scale: '文字大小', account: '账户', add_account: '添加账户', settings: '设置', language: '语言',

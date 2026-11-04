@@ -1,14 +1,17 @@
 // Translations: every language is a file locales/<code>.js that registers itself in window.LOCALES.
 // New language: create locales/xx.js (keys as in en.js, plus _name) and include it in index.html via <script>.
-// Regional variants use the full code, e.g. locales/pt-BR.js registering LOCALES['pt-BR']; a code without its own file falls back to the base language (zh-TW → zh).
-// Missing keys fall back to English. Plurals: <key>_one / <key>_other etc. (Intl.PluralRules), call t('key', {n}).
+// Variants use the full code, e.g. LOCALES['pt-BR'], or a script code that covers several regions: LOCALES['zh-Hant'] for zh-TW / zh-HK / zh-MO.
+// Matching order: full code (pt-BR), language-script (zh-Hant), language (pt), English.
+// Missing keys fall back to the base language (pt-BR → pt), then English. Plurals: <key>_one / <key>_other etc. (Intl.PluralRules), call t('key', {n}).
 (() => {
   const L = (window.LOCALES ||= {});
   let lang = 'en';
+  const has = c => Object.keys(L).find(k => k.toLowerCase() === c.toLowerCase());
   const pick = code => {
-    code = String(code || '').toLowerCase();
-    const has = c => Object.keys(L).find(k => k.toLowerCase() === c);
-    return has(code) || has(code.split('-')[0]) || 'en';
+    code = String(code || '');
+    let script = '';
+    try { const m = new Intl.Locale(code).maximize(); script = `${m.language}-${m.script}`; } catch {} // zh-TW → zh-Hant
+    return has(code) || has(script) || has(code.split('-')[0]) || 'en';
   };
   const find = (code, key, n) => {
     const d = L[code] || {};
@@ -20,7 +23,7 @@
   };
   window.I18N = {
     t(key, vars = {}) {
-      const s = find(lang, key, vars.n) ?? find('en', key, vars.n) ?? key;
+      const s = find(lang, key, vars.n) ?? find(lang.split('-')[0], key, vars.n) ?? find('en', key, vars.n) ?? key;
       return s.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
     },
     get lang() { return lang; },
