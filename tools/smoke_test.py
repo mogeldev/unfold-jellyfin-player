@@ -1,5 +1,5 @@
 """Checks login, libraries, items, details and PlaybackInfo against a real server (without mpv).
-Usage: python tools/smoke_test.py http://192.168.0.4:8096 test   (the password is prompted)"""
+Usage: python tools/smoke_test.py http://jellyfin.local:8096 <user>  (the password is prompted)"""
 import getpass
 import sys
 from pathlib import Path
