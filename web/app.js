@@ -4,11 +4,16 @@
   const hue = s => [...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 
   // Backend: pywebview in the app; the browser preview opens index.html#mock (web/mock.js)
-  const raw = location.hash === '#mock' ? window.MOCK : await new Promise(res => {
+  // Android: web/webapi.js
+  const raw = location.hash === '#mock' ? window.MOCK : window.WEBAPI || await new Promise(res => {
     if (window.pywebview && window.pywebview.api) return res(window.pywebview.api);
     window.addEventListener('pywebviewready', () => res(window.pywebview.api));
   });
   const t = (k, v) => I18N.t(k, v);
+  // Touch: the window cannot follow the columns (Android), so #app scrolls sideways instead (base.css: html.touch)
+  const touch = !raw.fit_window;
+  document.documentElement.classList.toggle('touch', touch);
+  let go = 0; // touch: column to scroll to after the next render (the one the last tap filled)
   const APP = 'Unfold – Jellyfin Player';
   // Backend errors arrive as a code (+ params) and are translated here
   const call = async (n, ...a) => {
@@ -118,7 +123,7 @@
     let p = { proto: 'http', host: '', port: '8096', user: st.user || '' };
     try {
       const u = new URL(st.server);
-      p = { ...p, proto: u.protocol.slice(0, -1), host: u.hostname, port: u.port };
+      p = { ...p, proto: u.protocol.slice(0, -1), host: u.hostname + u.pathname.replace(/\/$/, ''), port: u.port };
     } catch (_) {}
     for (;;) {
       const v = await form(APP, [
@@ -130,9 +135,9 @@
       if (!v) return false;
       p = { proto: v.proto, host: v.host, port: v.port, user: v.user };
       if (v.__lang) { await setLang(v.__lang); error = ''; continue; } // rebuild the dialog in the new language, keeping the input
-      const host = v.host.trim().replace(/^https?:\/\//i, '').replace(/[\/:].*$/, '');
+      const [, host, path] = v.host.trim().replace(/^https?:\/\//i, '').match(/^([^\/:]*)[^\/]*(.*)$/); // path: server behind a base URL (host/jellyfin)
       const port = v.port.trim();
-      try { await call('login', `${v.proto}://${host}${port ? ':' + port : ''}`, v.user, v.password); return true; } catch (e) { error = e.message; }
+      try { await call('login', `${v.proto}://${host}${port ? ':' + port : ''}${path}`, v.user, v.password); return true; } catch (e) { error = e.message; }
     }
   }
 
@@ -306,7 +311,7 @@
     if (!it) { commit(lib < 0 && !searchOn ? [[1, c1]] : [[1, c1], [2, c2]]); return; }
     const cur = target();
     const c3 = `<div class="d"><div class="poster" style="--hue:${hue(it.name)};${it.poster ? `background-image:url('${esc(it.poster)}')` : ''}"></div><h1>${esc(it.name)}</h1>
-      <div class="meta">${esc(it.year)} · ${it.type === 'movie' ? esc(it.min) + ' ' + t('min') : t('seasons', { n: it.seasons.length })}${it.seen ? ' · ' + t('watched') : ''}</div><p>${esc(it.ov)}</p></div>`;
+      <div class="meta">${esc(it.year)} · ${it.type === 'movie' ? esc(it.min) + ' ' + t('min') : t('seasons', { n: it.seasons.length })}${it.seen ? ' · ' + t('watched') : ''}</div>${!touch ? '' : it.type === 'series' ? `<button class="play next" data-go="4">${t('episodes')}</button>` : `<button class="play next" data-go="5">${t('audio')} · ${t('subtitles')}</button>`}<p>${esc(it.ov)}</p></div>`; // touch: the way on from this column
     const c4 = it.type !== 'series' ? '' : `<div class="h">${t('episodes')}</div>` + it.seasons.map((s, a) =>
       `<div class="letter">${esc(t('season', { n: s.n }))}</div>` + s.eps.map((e, b) =>
         `<a class="item${a === si && b === ei ? ' on' : ''}${e.seen ? ' seen' : ''}" data-ep="${a}.${b}"><span>${e.seen ? '✓' : '○'} ${esc(e.n)}. ${esc(e.t)}</span><span class="meta">${esc(e.min)} ${t('min')}</span></a>`).join('')).join('');
@@ -338,6 +343,8 @@
     layout(added);
     app.querySelectorAll('.col').forEach(c => c.scrollTop = keep[c.classList[1]] || 0);
     if (!app.querySelector('.col.' + fcol)) fcol = 'c1';
+    if (touch && go) app.scrollTo({ left: app.querySelector('.c' + go)?.offsetLeft, behavior: 'smooth' });
+    go = 0;
     const fc = app.querySelector('.col.' + fcol);
     fc.classList.add('focus');
     if (focusSearch) { // re-activate the search field after the rebuild (cursor at the end)
@@ -425,6 +432,14 @@
       cols.forEach(c => { c.classList.remove('unfolding'); c.style.removeProperty('--i'); });
     }, 1000);
   }
+  // Android back button: close a dialog, else one column to the left; false = nothing left to go back to (the app closes)
+  window.goBack = () => {
+    const x = document.querySelector('.dlg [data-x]');
+    if (x) { x.click(); return true; }
+    const prev = [...app.querySelectorAll('.col')].reverse().find(c => c.offsetLeft < app.scrollLeft - 1);
+    if (prev) app.scrollTo({ left: prev.offsetLeft, behavior: 'smooth' });
+    return !!prev;
+  };
   window.refit = () => { lastFit = 0; layout(); }; // after fullscreen: fit the window width to the columns again
   app.addEventListener('pointerdown', e => {
     const h = e.target.closest('[data-rz]');
@@ -448,6 +463,7 @@
   app.addEventListener('click', guard(async e => {
     const q = a => e.target.closest(`[data-${a}]`);
     let x;
+    go = q('lib') || e.target.closest('[data-act=search]') ? 2 : q('item') ? 3 : q('ep') ? 5 : 0;
     const col = e.target.closest('.col');
     if (col) { const c = [...col.classList].find(n => /^c\d$/.test(n)); fcol = c === 'c3' ? 'c2' : c; }
     if ((x = q('az'))) {
@@ -460,6 +476,7 @@
       fsOn = !fsOn; x.classList.toggle('swon', fsOn);
       return;
     }
+    else if ((x = q('go'))) { app.scrollTo({ left: app.querySelector('.c' + x.dataset.go).offsetLeft, behavior: 'smooth' }); return; }
     else if ((x = q('sc'))) setScale(scale + +x.dataset.sc);
     else if ((x = q('lib'))) return selectLib(+x.dataset.lib);
     else if ((x = q('item'))) return selectItem(+x.dataset.item);

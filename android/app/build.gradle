@@ -1,0 +1,20 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'io.github.mogeldev.unfold'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'io.github.mogeldev.unfold'
+        minSdk 26 // libmpv
+        // shortcut: 34 keeps the system bars outside the WebView; 35+ draws edge to edge and needs inset handling first
+        targetSdk 34
+        ndk { abiFilters 'arm64-v8a', 'x86_64' } // phones and the emulator; libmpv is ~25 MB per ABI
+        versionCode 1
+        versionName '0.3.2'
+    }
+    sourceSets.main.assets.srcDirs = ['../../web'] // the same frontend as the desktop app, no copy
+}
+
+dependencies {
+    implementation 'dev.jdtech.mpv:libmpv:1.0.0' // mpv 0.41 + FFmpeg, prebuilt
+}

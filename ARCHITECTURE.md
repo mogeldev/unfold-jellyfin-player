@@ -37,6 +37,20 @@ web/  (HTML/CSS/JS)  ──window.pywebview.api──►  main.py  Api (rpc → 
 - Fullscreen (library switch, F11, `f` while playing) toggles the app window; on Windows 11 `chrome.set_fullscreen_frame` removes the rounded corners and the border. Staying in or leaving fullscreen is carried over into the library; leaving it refits the window width to the columns.
 - libmpv: on Windows `lib/libmpv-2.dll` lives in the project (`python tools/fetch_libmpv.py`, needs 7-Zip), Linux uses the system libmpv (libmpv2 / mpv-libs). The position comes straight from a property observer, no IPC pipe.
 
+## Android
+
+```
+web/  ──window.WEBAPI──►  web/webapi.js  (the Api of main.py in JS: fetch + localStorage)
+                             └─ window.Android.play ──► MainActivity.java ──► libmpv (dev.jdtech.mpv:libmpv, mpv 0.41)
+```
+
+- `android/` is a WebView shell; `web/` is bundled as assets directly (no copy). The page runs from `file://`, so the server must allow CORS (Jellyfin's default).
+- Touch layout (`html.touch`, set when the backend has no `fit_window`): `#app` scrolls sideways and snaps to columns; up to 600 px width every column is exactly one screen. A tap on a library / entry / episode scrolls on to the column it filled, column 3 has a button to the next one; the Back button goes one column left (`window.goBack`), then closes the app. No resize handles, no fullscreen switch.
+- Playback: like `embed.py` on Windows, mpv renders into a view on top of the UI (a `SurfaceView`, landscape, immersive). `webapi.js` builds the mpv options (`vid`/`aid`/`sid`, `start`, `sub-files-append`, title, then the user's mpv options) and passes them as lines; `MainActivity` adds the Android defaults (`vo=gpu`, `hwdec=mediacodec-copy`, OSC scaled for fingers). Touch is forwarded to mpv as a mouse, so the controls are mpv's OSC. Back or the end of the file calls `window.onPlayerResult(ms)`; progress reports come from a 10 s timer in `webapi.js` that asks `Android.position()`.
+- TLS: mpv does not verify certificates by default; here `tls-verify=yes` with a PEM file written from Android's CA store (system and user certificates) on every start of a video.
+- Limits: the token is stored in the WebView's app-private localStorage. Subtitle and OSC font is Roboto (no CJK glyphs unless the file embeds its fonts). Only `arm64-v8a` and `x86_64` are packaged. No page-turn animation into the video. `targetSdk` 34 (35 would need edge-to-edge insets).
+- Browser preview of this backend against a real server: `index.html#web` (Play then shows the mpv options).
+
 ## Server communication (after JellyCon)
 
 | Purpose | Call |

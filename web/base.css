@@ -108,3 +108,18 @@ h1{font-size:1.5em;font-weight:var(--hw,600);line-height:1.15;margin-bottom:.3em
 .dlg .kr{display:grid;grid-template-columns:5.5em 1fr;gap:.8em;align-items:baseline}
 .dlg kbd{font:inherit;color:var(--fg);white-space:nowrap}
 .dlg .kr span{color:var(--fg);opacity:.75}
+/* Touch (html.touch, set in app.js when the window cannot be resized: Android): #app scrolls sideways and snaps column by column */
+html.touch{--fs:16px}
+.touch #app{width:100vw;min-width:0;overflow-x:auto;scroll-snap-type:x mandatory}
+.touch #app::-webkit-scrollbar{display:none}
+.touch .col{scroll-snap-align:start;scroll-snap-stop:always}
+.touch .item{padding:.7em var(--ip)}
+.touch .az-k{font-size:1em;padding:.3em .55em}
+.touch [data-fs],.touch .rz{display:none}
+/* Phone: every column fills the screen (!important beats the inline widths from template()) */
+@media (max-width:600px){
+  .touch #app{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:100vw}
+  .touch .col{border-right:0}
+}
+.touch .dlg .inline label:has(select){flex:none!important} /* protocol select at its natural width, else it is cut off on a phone */
+.next{margin-top:1em}

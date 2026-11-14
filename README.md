@@ -34,6 +34,15 @@ winget install JRSoftware.InnoSetup
 .\tools\make_installer.ps1      # installer\out\Unfold-Setup-<version>.exe + Unfold-<version>-portable.zip
 ```
 
+## Android (experimental)
+
+The same UI in a WebView; on a phone every column fills the screen (tap to move on, swipe or Back to go back). Playback is done by libmpv inside the app, with the chosen tracks and mpv's own on-screen controls; Back leaves the video.
+
+```
+cd android
+gradle assembleDebug            # needs the Android SDK (ANDROID_HOME) and Gradle 9; app/build/outputs/apk/debug/app-debug.apk
+```
+
 ## More
 
 Design, server calls and known limitations: [ARCHITECTURE.md](ARCHITECTURE.md).
