@@ -4,3 +4,4 @@ installer/out/
 .gradle/
 local.properties
 target/
+build/

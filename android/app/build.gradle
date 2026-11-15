@@ -8,8 +8,8 @@ android {
         minSdk 24
         // shortcut: 34 keeps the system bars outside the WebView; 35+ draws edge to edge and needs inset handling first
         targetSdk 34
-        versionCode 2
-        versionName '0.4.0'
+        versionCode 3
+        versionName '0.5.0'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
