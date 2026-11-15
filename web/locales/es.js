@@ -11,6 +11,7 @@
   protocol: 'Protocolo', server: 'Servidor', port: 'Puerto', user: 'Usuario', password: 'Contraseña',
   sign_in: 'Iniciar sesión', sign_out: 'Cerrar sesión', close: 'Cerrar', cancel: 'Cancelar', save: 'Guardar', ok: 'Aceptar', saved: 'Guardado',
   playback: 'Reproducción', play_embedded: 'En la ventana de la app', play_external: 'Ventana aparte', mpv_opts: 'Opciones de mpv, p. ej. hwdec=auto',
+  player_settings: 'Ajustes del reproductor',
   mpv_started: 'mpv iniciado', error: 'Error: {msg}',
   help: 'Ayuda', help_library: 'Biblioteca', help_playback: 'Durante la reproducción',
   k_cols: 'Cambiar de columna', k_sel: 'Seleccionar', k_letter: 'Saltar a la letra (lista)', k_play: 'Reproducir', k_search: 'Búsqueda',

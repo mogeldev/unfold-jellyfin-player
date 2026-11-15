@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- usesCleartextTraffic: Jellyfin servers in the home network usually speak plain http -->
+    <!-- The application class (App) and the player activities come from mpvkt; name, icon and theme stay Unfold's.
+         usesCleartextTraffic: Jellyfin servers in the home network usually speak plain http.
+         enableOnBackInvokedCallback=false: mpvkt turns it on, then Android 13+ would skip MainActivity.onBackPressed -->
     <application
         android:label="Unfold"
         android:icon="@drawable/icon"
         android:usesCleartextTraffic="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        android:enableOnBackInvokedCallback="false"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+        tools:replace="android:label,android:icon,android:theme,android:enableOnBackInvokedCallback"
+        tools:remove="android:roundIcon">
         <!-- configChanges: rotating must not rebuild the WebView (the UI state lives in the page) -->
         <activity
             android:name=".MainActivity"
@@ -17,6 +23,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <!-- mpvkt's own entry points: no second launcher icon, and Unfold does not offer itself as a video player
+             to other apps. Both activities are only started by MainActivity. -->
+        <activity android:name="live.mehiz.mpvkt.MainActivity" android:exported="false" tools:replace="android:exported">
+            <intent-filter tools:node="removeAll" />
+        </activity>
+        <activity android:name="live.mehiz.mpvkt.ui.player.PlayerActivity" android:exported="false" tools:replace="android:exported">
+            <intent-filter tools:node="removeAll" />
         </activity>
     </application>
 </manifest>

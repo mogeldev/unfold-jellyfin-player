@@ -36,11 +36,12 @@ winget install JRSoftware.InnoSetup
 
 ## Android (experimental)
 
-The same UI in a WebView; on a phone every column fills the screen (tap to move on, swipe or Back to go back). Playback is done by libmpv inside the app, with the chosen tracks and mpv's own on-screen controls; Back leaves the video.
+The same UI in a WebView; on a phone every column fills the screen (tap to move on, swipe or Back to go back). Playback is done by [unfold-mpv](https://github.com/mogeldev/unfold-mpv) (an mpvKt fork), built into the app as a git submodule: the chosen tracks, resume, touch controls and the player's own settings (Settings → Player settings).
 
 ```
+git submodule update --init     # android/mpvkt
 cd android
-gradle assembleDebug            # needs the Android SDK (ANDROID_HOME) and Gradle 9; app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug         # needs the Android SDK (ANDROID_HOME); app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## More

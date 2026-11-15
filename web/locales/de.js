@@ -11,6 +11,7 @@
   protocol: 'Protokoll', server: 'Server', port: 'Port', user: 'Benutzer', password: 'Passwort',
   sign_in: 'Anmelden', sign_out: 'Abmelden', close: 'Schließen', cancel: 'Abbrechen', save: 'Speichern', ok: 'OK', saved: 'Gespeichert',
   playback: 'Video abspielen', play_embedded: 'im App-Fenster', play_external: 'eigenes Fenster', mpv_opts: 'mpv-Optionen, z. B. hwdec=auto',
+  player_settings: 'Player-Einstellungen',
   mpv_started: 'mpv gestartet', error: 'Fehler: {msg}',
   help: 'Hilfe', help_library: 'Bibliothek', help_playback: 'Während der Wiedergabe',
   k_cols: 'Spalte wechseln', k_sel: 'Auswählen', k_letter: 'Zum Buchstaben springen (Liste)', k_play: 'Abspielen', k_search: 'Suche',

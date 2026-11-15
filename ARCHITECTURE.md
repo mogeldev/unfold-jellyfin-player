@@ -41,15 +41,16 @@ web/  (HTML/CSS/JS)  ──window.pywebview.api──►  main.py  Api (rpc → 
 
 ```
 web/  ──window.WEBAPI──►  web/webapi.js  (the Api of main.py in JS: fetch + localStorage)
-                             └─ window.Android.play ──► MainActivity.java ──► libmpv (dev.jdtech.mpv:libmpv, mpv 0.41)
+                             └─ window.Android.play ──► MainActivity.java ──intent──► PlayerActivity (unfold-mpv, in the same APK)
 ```
 
 - `android/` is a WebView shell; `web/` is bundled as assets directly (no copy). The page runs from `file://`, so the server must allow CORS (Jellyfin's default).
 - Touch layout (`html.touch`, set when the backend has no `fit_window`): `#app` scrolls sideways and snaps to columns; up to 600 px width every column is exactly one screen. A tap on a library / entry / episode scrolls on to the column it filled, column 3 has a button to the next one; the Back button goes one column left (`window.goBack`), then closes the app. No resize handles, no fullscreen switch.
-- Playback: like `embed.py` on Windows, mpv renders into a view on top of the UI (a `SurfaceView`, landscape, immersive). `webapi.js` builds the mpv options (`vid`/`aid`/`sid`, `start`, `sub-files-append`, title, then the user's mpv options) and passes them as lines; `MainActivity` adds the Android defaults (`vo=gpu`, `hwdec=mediacodec-copy`, OSC scaled for fingers). Touch is forwarded to mpv as a mouse, so the controls are mpv's OSC. Back or the end of the file calls `window.onPlayerResult(ms)`; progress reports come from a 10 s timer in `webapi.js` that asks `Android.position()`.
-- TLS: mpv does not verify certificates by default; here `tls-verify=yes` with a PEM file written from Android's CA store (system and user certificates) on every start of a video.
-- Limits: the token is stored in the WebView's app-private localStorage. Subtitle and OSC font is Roboto (no CJK glyphs unless the file embeds its fonts). Only `arm64-v8a` and `x86_64` are packaged. No page-turn animation into the video. `targetSdk` 34 (35 would need edge-to-edge insets).
-- Browser preview of this backend against a real server: `index.html#web` (Play then shows the mpv options).
+- Player: [unfold-mpv](https://github.com/mogeldev/unfold-mpv), an mpvKt fork kept for Unfold, as the submodule `android/mpvkt`. Its `player/` module is the app as an Android library (same sources); `android/settings.gradle` includes it and takes the plugin and library versions from the fork's version catalog. The merged manifest brings mpvKt's `App`, `PlayerActivity` and settings screen; Unfold's manifest keeps its own name, icon and theme and removes mpvKt's launcher entry and its "open video with" filters.
+- Playback: `MainActivity.play()` starts `PlayerActivity` with the mpv-android intent extras (`title`, `position`, `subs` for external text subtitles) plus what the fork adds: `media_id` (the Jellyfin item id; the player's saved state is per item, stream URLs all end in `stream`) and `vid`/`aid`/`sid`, which win over the player's saved state, like the position from the server. The result (`position` in ms) comes back through `window.onPlayerResult` and is sent as the Stopped report; progress reports come from a 10 s timer in `webapi.js` that asks `Android.position()` (MainActivity binds the player's service for that).
+- mpv options live in the player's own settings (decoder, subtitles, mpv.conf …), opened from Unfold's settings dialog; Unfold's mpv options field is hidden on Android.
+- Limits: the token is stored in the WebView's app-private localStorage. Only `arm64-v8a` and `x86_64` are packaged; the debug APK is large (~130 MB, unshrunk), no release build is set up yet. `targetSdk` 34 (35 would need edge-to-edge insets in the WebView). No page-turn animation into the video.
+- Browser preview of this backend against a real server: `index.html#web` (Play then shows what would be passed to the player).
 
 ## Server communication (after JellyCon)
 

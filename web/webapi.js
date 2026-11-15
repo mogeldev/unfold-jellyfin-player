@@ -1,6 +1,6 @@
 // Backend in JS for platforms without Python (Android WebView). Same interface as main.py (Api), answers as {ok, data|error}.
-// Jellyfin calls go through fetch (the server must allow CORS, which is Jellyfin's default). Playback is done by libmpv
-// in the app, started through window.Android (android/app/src/main/java/…/MainActivity.java).
+// Jellyfin calls go through fetch (the server must allow CORS, which is Jellyfin's default). Playback is done by the
+// mpvkt-rolling player built into the app, started through window.Android (android/app/src/main/java/…/MainActivity.java).
 // Browser preview against a real server: index.html#web (Play then only shows the stream URL).
 (() => {
   if (!window.Android && location.hash !== '#web') return;
@@ -52,10 +52,11 @@
   }
 
   const api = {
-    state: () => ({ logged_in: !!acc(), server: acc()?.server || '', user: acc()?.user || '', can_embed: false, mpv_opts: cfg.mpv_opts || '',
+    state: () => ({ logged_in: !!acc(), server: acc()?.server || '', user: acc()?.user || '', can_embed: false,
       lang: cfg.lang || '', active: cfg.active, accounts: cfg.accounts.map(a => `${a.user} @ ${a.server}`) }),
     set_lang(lang) { cfg.lang = String(lang).slice(0, 16); save(); },
-    save_settings(v) { cfg.mpv_opts = (v.mpv_opts || '').trim(); save(); },
+    save_settings() {}, // player options live in the player's own settings (player_settings)
+    player_settings() { window.Android?.playerSettings(); },
     // Sign in a new account and activate it; the same account (server + user, case-insensitive) is only updated
     async login(server, user, password) {
       server = server.trim().replace(/\/+$/, '');
@@ -99,25 +100,25 @@
       const url = `${acct.server}/Videos/${id}/stream?` + new URLSearchParams({ static: 'true', MediaSourceId: msId, PlaySessionId: psid, DeviceId: acct.device_id, api_key: acct.token });
       const resume = Math.round((d.UserData?.PlaybackPositionTicks || 0) / MS), runtime = d.RunTimeTicks;
       const title = d.Type === 'Episode' ? `${d.SeriesName || ''} S${d.ParentIndexNumber || 0}E${d.IndexNumber || 0} ${d.Name}` : d.Name;
-      // mpv options, one per line. mpv counts per track type from 1, in the same order as Jellyfin; the user's options come last and win
-      const opts = [`force-media-title=${title}`, `start=${resume / 1000}`,
-        ...(st.v.length ? [`vid=${v + 1}`] : []), ...(st.a.length ? [`aid=${a + 1}`] : []),
-        ...(st.s.length > 1 ? [`sid=${sub === st.s.length - 1 ? 'no' : sub + 1}`] : []),
-        ...ext.map(s => `sub-files-append=${acct.server}/Videos/${id}/${msId}/Subtitles/${s.Index}/Stream.${subFmt(s)}?api_key=${acct.token}`),
-        ...(cfg.mpv_opts || '').split(/\s+/).filter(Boolean)];
-      if (!window.Android) return { cmd: opts.filter(o => !/api_key|^force-media-title/.test(o)).map(o => '--' + o).join(' ') }; // browser preview
+      // mpv counts per track type from 1, in the same order as Jellyfin
+      const p = { url, title, id, position: resume,
+        ...(st.v.length ? { vid: String(v + 1) } : {}), ...(st.a.length ? { aid: String(a + 1) } : {}),
+        ...(st.s.length > 1 ? { sid: sub === st.s.length - 1 ? 'no' : String(sub + 1) } : {}),
+        subs: ext.map(s => `${acct.server}/Videos/${id}/${msId}/Subtitles/${s.Index}/Stream.${subFmt(s)}?api_key=${acct.token}`) };
+      if (!window.Android) return { cmd: JSON.stringify({ ...p, url: undefined, subs: p.subs.length }) }; // browser preview
       // kind: '' (start), '/Progress' or '/Stopped'; reporting must never disturb playback
       const report = (kind, ms) => req(acct, 'POST', '/Sessions/Playing' + kind, null, {
         ItemId: id, MediaSourceId: msId, PlaySessionId: psid, PositionTicks: Math.round(ms * MS),
         PlayMethod: 'DirectStream', CanSeek: true, IsPaused: false, ...(runtime ? { RunTimeTicks: runtime } : {}) }).catch(() => {});
-      const timer = setInterval(() => report('/Progress', window.Android.position()), 10000);
-      // Called by MainActivity when the video is left or ends, with the last position in ms ("watched" is decided by the server)
+      const timer = setInterval(() => { const ms = window.Android.position(); if (ms >= 0) report('/Progress', ms); }, 10000);
+      // Called by MainActivity when the player closes, with the last position in ms (-1: did not start).
+      // "Watched" is decided by the server from the position.
       window.onPlayerResult = async pos => {
         clearInterval(timer);
-        await report('/Stopped', pos);
+        await report('/Stopped', pos < 0 ? resume : pos);
         window.onPlaybackEnded?.(null, false);
       };
-      window.Android.play(url, resume, opts.join('\n'));
+      window.Android.play(JSON.stringify(p));
       report('', resume);
       return {};
     },

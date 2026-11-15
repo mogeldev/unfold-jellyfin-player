@@ -11,6 +11,7 @@
   protocol: 'Protocol', server: 'Server', port: 'Port', user: 'User', password: 'Password',
   sign_in: 'Sign in', sign_out: 'Sign out', close: 'Close', cancel: 'Cancel', save: 'Save', ok: 'OK', saved: 'Saved',
   playback: 'Playback', play_embedded: 'In app window', play_external: 'Separate window', mpv_opts: 'mpv options, e.g. hwdec=auto',
+  player_settings: 'Player settings',
   mpv_started: 'mpv started', error: 'Error: {msg}',
   help: 'Help', help_library: 'Library', help_playback: 'During playback',
   k_cols: 'Switch column', k_sel: 'Select', k_letter: 'Jump to letter (list)', k_play: 'Play', k_search: 'Search',

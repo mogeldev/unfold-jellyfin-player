@@ -502,9 +502,11 @@
         const v = await form(t('settings'), [
           { k: 'lang', label: t('language'), type: 'select', options: langs.map(l => l.name), value: langs.find(l => l.code === I18N.lang)?.name },
           ...(st.can_embed ? [{ k: 'embed', label: t('playback'), type: 'select', options: [EMB, EXT], value: st.embed ? EMB : EXT }] : []),
-          { k: 'mpv_opts', label: t('mpv_opts'), value: st.mpv_opts }], { submit: t('save'), cancel: t('cancel') });
+          ...(st.mpv_opts === undefined ? [] : [{ k: 'mpv_opts', label: t('mpv_opts'), value: st.mpv_opts }])],
+          { submit: t('save'), cancel: t('cancel'), out: raw.player_settings ? t('player_settings') : '' }); // Android: the player has its own settings
+        if (v?.__out) { call('player_settings'); return; }
         if (v) {
-          await call('save_settings', { mpv_opts: v.mpv_opts.trim(), embed: v.embed !== EXT });
+          await call('save_settings', { mpv_opts: (v.mpv_opts || '').trim(), embed: v.embed !== EXT });
           const code = langs.find(l => l.name === v.lang)?.code;
           if (code && code !== I18N.lang) { await setLang(code); render(); }
           say(t('saved'));

@@ -11,6 +11,7 @@
   protocol: '协议', server: '服务器', port: '端口', user: '用户名', password: '密码',
   sign_in: '登录', sign_out: '退出登录', close: '关闭', cancel: '取消', save: '保存', ok: '确定', saved: '已保存',
   playback: '播放', play_embedded: '在应用窗口中', play_external: '独立窗口', mpv_opts: 'mpv 选项，例如 hwdec=auto',
+  player_settings: '播放器设置',
   mpv_started: 'mpv 已启动', error: '错误：{msg}',
   help: '帮助', help_library: '媒体库', help_playback: '播放期间',
   k_cols: '切换列', k_sel: '选择', k_letter: '跳转到字母（列表）', k_play: '播放', k_search: '搜索',

@@ -1,0 +1,3 @@
+[submodule "android/mpvkt"]
+	path = android/mpvkt
+	url = https://github.com/mogeldev/unfold-mpv.git

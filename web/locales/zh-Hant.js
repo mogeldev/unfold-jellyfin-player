@@ -11,6 +11,7 @@
   protocol: '通訊協定', server: '伺服器', port: '連接埠', user: '使用者名稱', password: '密碼',
   sign_in: '登入', sign_out: '登出', close: '關閉', cancel: '取消', save: '儲存', ok: '確定', saved: '已儲存',
   playback: '播放', play_embedded: '在應用程式視窗中', play_external: '獨立視窗', mpv_opts: 'mpv 選項，例如 hwdec=auto',
+  player_settings: '播放器設定',
   mpv_started: 'mpv 已啟動', error: '錯誤：{msg}',
   help: '說明', help_library: '媒體庫', help_playback: '播放期間',
   k_cols: '切換欄', k_sel: '選擇', k_letter: '跳至字母（清單）', k_play: '播放', k_search: '搜尋',
