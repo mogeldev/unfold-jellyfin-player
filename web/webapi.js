@@ -4,7 +4,7 @@
 // Browser preview against a real server: index.html#web (Play then only shows the stream URL).
 (() => {
   if (!window.Android && location.hash !== '#web') return;
-  const VERSION = '0.3';
+  const VERSION = '0.4';
   const MS = 1e4; // Jellyfin ticks per millisecond
   class AppError extends Error { constructor(code, params = {}) { super(code); this.code = code; this.params = params; } }
 

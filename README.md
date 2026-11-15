@@ -11,11 +11,12 @@ A lean desktop player for [Jellyfin](https://jellyfin.org). It only shows your l
 
 Windows is the main platform (WebView2, mpv embedded in the window). Linux runs with a separate mpv window but is untested.
 
-## Download (Windows 10/11, 64-bit)
+## Download
 
 From [Releases](https://github.com/mogeldev/unfold-jellyfin-player/releases/latest):
-- `Unfold-Setup-<version>.exe`: installer (per user, no admin rights)
+- `Unfold-Setup-<version>.exe`: Windows 10/11 (64-bit) installer (per user, no admin rights)
 - `Unfold-<version>-portable.zip`: unzip anywhere and start `Unfold\Unfold.exe`; settings are kept in `%APPDATA%\unfold`
+- `Unfold-<version>-android-<abi>.apk`: Android 7+ (experimental); most phones need `arm64-v8a`, older ones `armeabi-v7a`
 
 ## Run from source
 
@@ -41,7 +42,7 @@ The same UI in a WebView; on a phone every column fills the screen (tap to move 
 ```
 git submodule update --init     # android/mpvkt
 cd android
-./gradlew assembleDebug         # needs the Android SDK (ANDROID_HOME); app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease       # needs the Android SDK (ANDROID_HOME); one APK per ABI in app/build/outputs/apk/release/
 ```
 
 ## More

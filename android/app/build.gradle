@@ -8,13 +8,27 @@ android {
         minSdk 24
         // shortcut: 34 keeps the system bars outside the WebView; 35+ draws edge to edge and needs inset handling first
         targetSdk 34
-        ndk { abiFilters 'arm64-v8a', 'x86_64' } // phones and the emulator; mpv is ~25 MB per ABI
-        versionCode 1
-        versionName '0.3.2'
+        versionCode 2
+        versionName '0.4.0'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+    // One APK per ABI (mpv is ~25 MB per ABI): current phones, older 32-bit phones, the emulator
+    splits.abi {
+        enable true
+        reset()
+        include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+    }
+    buildTypes {
+        release {
+            minifyEnabled true // the player's Compose UI makes an unshrunk APK ~130 MB
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../mpvkt/app/proguard-rules.pro', 'proguard-rules.pro'
+            // shortcut: signed with the debug key of the build machine, like unfold-mpv's preview builds;
+            // set up a release keystore before updates must install across machines
+            signingConfig signingConfigs.debug
+        }
     }
     sourceSets.main.assets.srcDirs = ['../../web'] // the same frontend as the desktop app, no copy
 }
