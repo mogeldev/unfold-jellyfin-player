@@ -1,0 +1,27 @@
+[package]
+name = "unfold"
+version = "0.5.0"
+edition = "2024"
+
+[[bin]]
+name = "Unfold"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+strip = true
+
+[dependencies]
+base64 = "0.23.1"
+html-escape = "0.3.1"
+jpeg-encoder = "0.7.1"
+libloading = "0.9.1"
+serde_json = "1.0.154"
+tao = "0.37.2"
+ureq = { version = "3.5.2", default-features = false, features = ["json", "native-tls"] }
+uuid = { version = "1.29.2", features = ["v4"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_System_Threading", "Win32_Security_Credentials", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse"] }
+wry = { version = "0.57.2", features = ["devtools"] }
+
+[build-dependencies]
+winresource = "0.1.34"

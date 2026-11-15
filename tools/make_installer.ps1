@@ -2,7 +2,6 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot)
 & "$PSScriptRoot\build.ps1"
-Copy-Item LICENSE dist\Unfold\LICENSE.txt
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
     Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup missing: winget install JRSoftware.InnoSetup" }

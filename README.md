@@ -9,7 +9,7 @@ A lean desktop player for [Jellyfin](https://jellyfin.org). It only shows your l
 - Watched state and progress are reported back to the server; playback resumes where you left off
 - Book-style page-turn animations when opening columns and when starting or leaving playback
 
-Windows is the main platform (WebView2, mpv embedded in the window). Linux runs with a separate mpv window but is untested.
+Windows 10/11 is the main platform (written in Rust, WebView2, mpv embedded in the window); Android is experimental.
 
 ## Download
 
@@ -21,12 +21,10 @@ From [Releases](https://github.com/mogeldev/unfold-jellyfin-player/releases/late
 ## Run from source
 
 ```
-pip install -r requirements.txt
-python tools/fetch_libmpv.py    # Windows only, needs 7-Zip
-python main.py                  # JF_DEBUG=1 for dev tools
+winget install Rustlang.Rustup   # plus Visual Studio Build Tools (C++ and Windows SDK)
+.\tools\fetch_libmpv.ps1         # once, needs 7-Zip
+cargo run                        # JF_DEBUG=1 for dev tools
 ```
-
-Python 3.10+. On Linux you need `libmpv2` / `mpv-libs` from your package manager.
 
 ## Build the installer and the portable zip (Windows)
 
@@ -48,4 +46,4 @@ cd android
 ## More
 
 Design, server calls and known limitations: [ARCHITECTURE.md](ARCHITECTURE.md).
-The password is never stored, only the token (keyring, otherwise the config file).
+The password is never stored, only the token (Windows Credential Manager, otherwise the config file).

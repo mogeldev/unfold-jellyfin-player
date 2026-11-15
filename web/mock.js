@@ -1,4 +1,4 @@
-// Mock backend for the browser preview without pywebview. Same interface as main.py (Api), answers as {ok, data|error}.
+// Mock backend for the browser preview without a backend. Same interface as src/main.rs (App::call), answers as {ok, data|error}.
 (() => {
   const A = ['Deutsch · EAC3 5.1', 'English · TrueHD 7.1', 'English · AAC 2.0'];
   const S = ['Deutsch · SRT', 'English · SRT', 'English · SDH', 'Off'];
@@ -29,7 +29,7 @@
     search: q => LIBS.flatMap(l => l.items).filter(x => x.name.toLowerCase().includes(q.toLowerCase()))
       .map(({ id, name, year, type, seen }) => ({ id, name, year, type, seen })),
     detail: id => LIBS.flatMap(l => l.items).find(x => x.id === id),
-    tracks: () => st(true), // episodes come without tracks, like from main.py
+    tracks: () => st(true), // episodes come without tracks, like from the real backend
     play: (id, v, a, s) => ({ cmd: `mpv --vid=${v + 1} --aid=${a + 1} --sid=${s + 1} <stream-url>` }),
   };
   window.MOCK = Object.fromEntries(Object.entries(impl).map(([k, f]) => [k, async (...a) => ({ ok: true, data: f(...a) })]));

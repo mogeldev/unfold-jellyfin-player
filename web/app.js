@@ -1,4 +1,4 @@
-// Frontend: 5 columns. Data comes through api (pywebview → main.py, or MOCK in the browser).
+// Frontend: 5 columns. Data comes through api (window.pywebview.api → src/main.rs on Windows, web/webapi.js on Android, MOCK in the browser).
 (async () => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hue = s => [...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;

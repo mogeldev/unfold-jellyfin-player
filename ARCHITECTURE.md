@@ -12,7 +12,7 @@ Principle: **the player only shows the library. mpv does the playing.** No video
 | 4 | Episodes by season with ✓/○ (series only) |
 | 5 | Video / audio / subtitle track, ▶ Play at the bottom |
 
-At start only column 1 is shown; column 2 appears after clicking a library, the others after clicking an entry. Widths adapt to the content automatically (capped); dragging sets a fixed width, double-clicking the handle makes it automatic again. The window width follows the visible columns (`chrome.fit_width`), the height stays as it is. Themes: terminal, nord, blueprint.
+At start only column 1 is shown; column 2 appears after clicking a library, the others after clicking an entry. Widths adapt to the content automatically (capped); dragging sets a fixed width, double-clicking the handle makes it automatic again. The window width follows the visible columns (`win::fit_width`), the height stays as it is. Themes: terminal, nord, blueprint.
 
 Keyboard: ←→ switch column, ↑↓ select, a letter jumps within the list (column 2), Enter = play, F11 = fullscreen. `/` opens the search (all libraries, movies and series, hits by relevance); Enter/↓ opens the first result, Esc closes. `?` (or "Help" at the bottom of column 1) shows all keys, for the library and during playback.
 
@@ -20,27 +20,31 @@ Letter bar (0-9, A–Z, … if needed) at the top of column 2: a click filters t
 
 Animations (motif: book):
 - New column: its content opens like a page around the left edge (`.col.unfolding`, several one after another). Choosing another entry unfolds columns 3–5 again; going back folds the removed columns shut (`foldAway()`).
-- Opening/leaving mpv (embedded only): `Embed.snapshot()` returns a screen-grab image of the window (`Api.snapshot`). `pageOut()`/`pageBack()` in `app.js` turn the right half as a leaf around the middle. On the way back, the last video frame lies on the back of the leaf and on the right side at the start: Back/Esc grabs it while mpv still shows it, the frontend decodes it and puts it in place (`window.prepareBack`), the backend waits for that (max 2 s) and only then quits mpv. At the end of a file the frame comes from the last progress report in the final 20 s. Skipped with "reduce motion".
+- Opening/leaving mpv (embedded only): `win::snapshot()` returns a screen-grab image of the window (API method `snapshot`). `pageOut()`/`pageBack()` in `app.js` turn the right half as a leaf around the middle. On the way back, the last video frame lies on the back of the leaf and on the right side at the start: Back/Esc grabs it while mpv still shows it, the frontend decodes it and puts it in place (`window.prepareBack`), the backend waits for that (max 2 s) and only then quits mpv. At the end of a file the frame comes from the last progress report in the final 20 s. Skipped with "reduce motion".
 
-## Tech: Python + pywebview
+## Tech: Rust + WebView2 (Windows)
 
 ```
-web/  (HTML/CSS/JS)  ──window.pywebview.api──►  main.py  Api (rpc → {ok,data|error})
-                                                  ├─ jellyfin.py  stdlib HTTP client
-                                                  ├─ player.py    libmpv (python-mpv), own mpv window
-                                                  └─ config.py    config.json + keyring
+web/  (HTML/CSS/JS)  ──window.pywebview.api──►  src/main.rs   App::call (rpc → {ok,data|error}), window, event loop
+                                                  ├─ src/jellyfin.rs  HTTP client (ureq, Windows certificate store)
+                                                  ├─ src/mpv.rs       libmpv, loaded at runtime from lib\libmpv-2.dll
+                                                  ├─ src/win.rs       Win32: title bar colour, fit_width, player panel, screen grab
+                                                  └─ src/config.rs    config.json + Windows Credential Manager
 ```
 
-- `web/mock.js` replaces the backend in a normal browser: open `index.html#mock` (preview without a server). Without `#mock` the page waits for pywebview.
-- Platforms: Windows (WebView2), Linux (GTK/WebKit or Qt).
-- Embedded (Windows): `embed.py` puts a WinForms panel over the web UI and mpv renders into it via `wid`. A bar with "← Back" on top (quits mpv, theme colours, hidden in fullscreen); Esc quits as well, `f` = fullscreen of the app window; fallback/setting: own mpv window. mpv creates the embedded window disabled (WS_DISABLED): `enable_input()` enables it and sets the focus, otherwise neither mouse (OSC) nor keys work. Linux: own window.
-- Fullscreen (library switch, F11, `f` while playing) toggles the app window; on Windows 11 `chrome.set_fullscreen_frame` removes the rounded corners and the border. Staying in or leaving fullscreen is carried over into the library; leaving it refits the window width to the columns.
-- libmpv: on Windows `lib/libmpv-2.dll` lives in the project (`python tools/fetch_libmpv.py`, needs 7-Zip), Linux uses the system libmpv (libmpv2 / mpv-libs). The position comes straight from a property observer, no IPC pipe.
+- Window: `tao` + `wry` (WebView2). `web/` is served from disk through the custom protocol `unfold://` (`http://unfold.localhost/` in WebView2): next to the exe when installed, else the first `web/` above it (`cargo run`). WebView2 data (localStorage: theme, text size) lives in `%LOCALAPPDATA%\unfold\WebView2`.
+- Bridge: an initialization script defines `window.pywebview.api` (the name is kept from the Python version so `app.js` stays shared with Android). Every method posts `{id, m, a}` over `window.ipc`; Rust runs the call on a worker thread and answers with `window.__unfoldResolve(id, result)`. Calls that need the UI thread (fullscreen, showing/hiding the webview, evaluating JS) go to the event loop as user events. `window.__unfoldWait` lets the backend wait for a promise in the page (used for `prepareBack`).
+- `web/mock.js` replaces the backend in a normal browser: open `index.html#mock` (preview without a server).
+- Embedded player: `win::embed_*` puts a child window over the web UI: a bar with "← Back" on top (painted with GDI in the theme colours; quits mpv, hidden in fullscreen) and the video area below, whose HWND goes to mpv as `wid`. WebView2 is composited above GDI-painted sibling windows, so the webview is hidden while the panel is up. Esc is bound in mpv (`keybind ESC script-message unfold-back`) and quits as well; `f` = fullscreen of the app window (mpv's `fullscreen` property is observed, reset, and the app window toggled instead); fallback/setting: own mpv window. mpv creates the embedded window disabled (WS_DISABLED): `win::enable_input()` enables it and sets the focus, otherwise neither mouse (OSC) nor keys work.
+- Fullscreen (library switch, F11, `f` while playing) toggles the app window; on Windows 11 `win::set_fullscreen_frame` removes the rounded corners and the border. Staying in or leaving fullscreen is carried over into the library; leaving it refits the window width to the columns.
+- libmpv: `lib/libmpv-2.dll` (`tools\fetch_libmpv.ps1`, needs 7-Zip) is loaded with `libloading`, no import library needed. The position comes straight from a property observer (`time-pos`).
+- Tokens: Credential Manager under the names Python's `keyring` used (`<user>@<server>@unfold`, or the bare `unfold` entry), so sign-ins from 0.4 carry over.
+- Windows only. The Python version (0.1–0.4, which also ran on Linux with its own mpv window) was removed in 0.5.
 
 ## Android
 
 ```
-web/  ──window.WEBAPI──►  web/webapi.js  (the Api of main.py in JS: fetch + localStorage)
+web/  ──window.WEBAPI──►  web/webapi.js  (the API of src/main.rs in JS: fetch + localStorage)
                              └─ window.Android.play ──► MainActivity.java ──intent──► PlayerActivity (unfold-mpv, in the same APK)
 ```
 
@@ -71,8 +75,8 @@ web/  ──window.WEBAPI──►  web/webapi.js  (the Api of main.py in JS: fe
 "Watched" is set by the server from the Stopped report; afterwards the frontend reloads (`onPlaybackEnded`). Resume: `UserData.PlaybackPositionTicks` → `mpv --start`.
 
 ## Accounts
-- Several accounts: `accounts` in the config (server, user, user_id, own `device_id`, token in the keyring per `user@server`), `active` = the active account. "Account" dialog: click an account to switch, "Add account", "Sign out" (removes the active account). Every account has its own device_id so sign-ins on the same server do not sign each other out. User names are matched case-insensitively (like Jellyfin). Single-account configs from before 0.2 are converted once on start.
-- The password is never stored, only the token (keyring, otherwise the config file with 0600).
+- Several accounts: `accounts` in the config (server, user, user_id, own `device_id`, token in the Windows Credential Manager per `user@server`), `active` = the active account. "Account" dialog: click an account to switch, "Add account", "Sign out" (removes the active account). Every account has its own device_id so sign-ins on the same server do not sign each other out. User names are matched case-insensitively (like Jellyfin). Single-account configs from before 0.2 are converted once on start.
+- The password is never stored, only the token (Credential Manager, otherwise the config file).
 - The config is written to a temp file and swapped in (no half-written file after a crash); a file that cannot be parsed is kept as `config.json.bad`.
 - Playback: one player at a time (a second Play while mpv runs or starts is ignored). The start report goes to the server only once mpv is running.
 
@@ -83,16 +87,16 @@ web/  ──window.WEBAPI──►  web/webapi.js  (the Api of main.py in JS: fe
 
 ## Run
 ```
-pip install -r requirements.txt
-python tools/fetch_libmpv.py   # Windows only
-python main.py                 # JF_DEBUG=1 for dev tools
+.\tools\fetch_libmpv.ps1   # once, needs 7-Zip
+cargo run                  # JF_DEBUG=1 for dev tools
+cargo test                 # unit tests (parsers, track lists)
 ```
-Requirements: Python 3.10+, on Windows run `python tools/fetch_libmpv.py` once.
+Requirements: Rust (rustup, MSVC toolchain), Visual Studio Build Tools with the Windows SDK, the WebView2 runtime (part of Windows 10/11).
 
 ## Languages (i18n)
 - All texts live in `web/locales/<code>.js` (currently `en`, `de`); `web/i18n.js` provides `I18N.t(key, {vars})` with placeholders `{name}`, plurals via `key_one`/`key_other` (`t('seasons', {n})`) and a fallback to English.
 - New language: create `locales/xx.js` following `en.js` (incl. `_name`) and include it in `web/index.html`. It shows up automatically in the login dialog and in the settings.
 - Start: saved language (`lang` in the config), otherwise the system language, otherwise English. Switch in the login dialog or under settings.
-- The backend translates nothing: errors are `AppError(code, **params)` and arrive as `err_<code>` in the frontend. The label of the back button is supplied by the frontend when playing.
+- The backend translates nothing: errors are `AppError::Code(code, params)` and arrive as `err_<code>` in the frontend. The label of the back button is supplied by the frontend when playing.
 - The last subtitle entry is always "Off" (text `subs_off`); titles and descriptions come untranslated from the server.
 - Everything else in the repository (code, comments, docs, scripts) is English; only the app content is multilingual.

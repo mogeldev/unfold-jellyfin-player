@@ -1,4 +1,4 @@
-// Backend in JS for platforms without Python (Android WebView). Same interface as main.py (Api), answers as {ok, data|error}.
+// Backend in JS for Android (WebView). Same interface as src/main.rs (App::call), answers as {ok, data|error}.
 // Jellyfin calls go through fetch (the server must allow CORS, which is Jellyfin's default). Playback is done by the
 // mpvkt-rolling player built into the app, started through window.Android (android/app/src/main/java/…/MainActivity.java).
 // Browser preview against a real server: index.html#web (Play then only shows the stream URL).
@@ -8,7 +8,7 @@
   const MS = 1e4; // Jellyfin ticks per millisecond
   class AppError extends Error { constructor(code, params = {}) { super(code); this.code = code; this.params = params; } }
 
-  // Accounts as in config.py; the token lives in the WebView's app-private storage (no keyring here)
+  // Accounts as in src/config.rs; the token lives in the WebView's app-private storage (no Credential Manager here)
   let cfg = { accounts: [], active: 0 };
   try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem('cfg')) }; } catch (_) {}
   const save = () => localStorage.setItem('cfg', JSON.stringify(cfg));
@@ -40,7 +40,7 @@
   const list = async params => (await get('/Items', { userId: need().user_id, Recursive: 'true', IncludeItemTypes: 'Movie,Series', Fields: 'ProductionYear', ...params })).Items.map(summary);
   const SUB = { srt: 'srt', subrip: 'srt', ass: 'ass', ssa: 'ass', vtt: 'vtt', webvtt: 'vtt' }; // external text subtitles: codec → format of the stream URL
   const subFmt = s => SUB[(s.Codec || '').toLowerCase()];
-  // Like streams() in jellyfin.py: track names per type (embedded subtitles first, then the external text ones that mpv
+  // Like streams() in src/jellyfin.rs: track names per type (embedded subtitles first, then the external text ones that mpv
   // loads afterwards, 'Off' last), the external subtitle streams and the MediaSourceId
   function streams(d) {
     const src = (d.MediaSources || [{}])[0], all = src.MediaStreams || d.MediaStreams || [];

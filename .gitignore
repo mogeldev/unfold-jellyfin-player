@@ -1,8 +1,6 @@
 lib/
-__pycache__/
-build/
 dist/
-*.spec
 installer/out/
 .gradle/
 local.properties
+target/
