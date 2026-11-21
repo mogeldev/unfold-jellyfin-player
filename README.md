@@ -18,6 +18,10 @@ From [Releases](https://github.com/mogeldev/unfold-jellyfin-player/releases/late
 - `Unfold-<version>-portable.zip`: unzip anywhere and start `Unfold\Unfold.exe`; settings are kept in `%APPDATA%\unfold`
 - `Unfold-<version>-android-<abi>.apk`: Android 7+ (experimental); most phones need `arm64-v8a`, older ones `armeabi-v7a`
 
+### Windows Defender warning
+
+The exe is not code-signed, so Defender's machine-learning check may wrongly flag a new version as a trojan. Restore it under Windows Security → Protection history → Actions → Restore (and allow it), or report it as a false positive at <https://www.microsoft.com/wdsi/filesubmission>.
+
 ## Run from source
 
 ```
@@ -30,6 +34,7 @@ cargo run                        # JF_DEBUG=1 for dev tools
 
 ```
 winget install JRSoftware.InnoSetup
+.\tools\fetch_libmpv.ps1         # once, if lib\libmpv-2.dll is missing
 .\tools\make_installer.ps1      # installer\out\Unfold-Setup-<version>.exe + Unfold-<version>-portable.zip
 ```
 

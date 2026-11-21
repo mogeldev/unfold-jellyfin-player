@@ -81,9 +81,14 @@ web/  ──window.WEBAPI──►  web/webapi.js  (the API of src/main.rs in JS
 - Playback: one player at a time (a second Play while mpv runs or starts is ignored). The start report goes to the server only once mpv is running.
 
 ## Known limitations
+- Windows: the exe is unsigned. Defender's ML heuristics have flagged a build as a trojan (0.5.0); 0.5.1 avoids the calls that look like spyware (screen grab, `AttachThreadInput`). A code-signing certificate (Azure Trusted Signing, SignPath) would be the lasting fix; false positives can be reported at microsoft.com/wdsi/filesubmission.
 - Subtitles: embedded ones first, then external text subtitles (srt/ass/vtt, loaded by mpv from the server via `/Videos/{id}/{source}/Subtitles/{index}/Stream.{fmt}`; mpv numbers them afterwards). External image subtitles (e.g. `.sup`) are not offered.
 - Settings: free mpv options, e.g. `hwdec=auto fullscreen=yes`.
 - mpv track number = position per type in Jellyfin's order.
+
+## Tools
+- `tools\build.ps1`: release build into `dist\Unfold`; `tools\make_installer.ps1`: that plus the Inno Setup installer and the portable zip in `installer\out`; `tools\fetch_libmpv.ps1`: downloads `lib\libmpv-2.dll`; `tools\make_icon.py` (Python + Pillow, rarely needed): regenerates `assets\icon.*`.
+- `.claude/serve.ts`: tiny Deno server for the browser preview of `web/` with `#mock`.
 
 ## Run
 ```

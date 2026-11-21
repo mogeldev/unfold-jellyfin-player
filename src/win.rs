@@ -199,6 +199,8 @@ pub fn enable_input(wid: isize) {
 
 // ---- Embedded player: a panel over the web UI, a slim bar with a back button on top, the video area below ----
 
+type KeyFn = Arc<dyn Fn(&str) + Send + Sync>;
+
 struct Embed {
     parent: isize,
     host: isize,
@@ -208,7 +210,7 @@ struct Embed {
     label: Vec<u16>,
     bar: bool,
     on_back: Option<Arc<dyn Fn() + Send + Sync>>,
-    on_key: Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    on_key: Option<KeyFn>,
 }
 static EMBED: Mutex<Option<Embed>> = Mutex::new(None);
 
@@ -334,7 +336,7 @@ pub fn embed_layout() {
 
 /// Show the panel (bar colours and label come from the frontend) and return the HWND of the video area.
 pub fn embed_show(bg: Option<&str>, fg: Option<&str>, back: Option<&str>, bar: bool, on_back: Arc<dyn Fn() + Send + Sync>,
-    on_key: Arc<dyn Fn(&str) + Send + Sync>) -> Option<isize> {
+    on_key: KeyFn) -> Option<isize> {
     let (host, video) = {
         let mut g = EMBED.lock().unwrap();
         let e = g.as_mut()?;

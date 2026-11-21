@@ -290,10 +290,10 @@ impl App {
             let (app, frame, slot) = (self.clone(), frame.clone(), slot.clone());
             Arc::new(move || {
                 let player = slot.lock().unwrap().clone();
-                if let Some((w, h, stride, px)) = player.and_then(|p| p.screenshot()) {
-                    if let Some(img) = win::frame_jpeg(app.hwnd, w, h, stride, &px) {
-                        *frame.lock().unwrap() = Some(img);
-                    }
+                if let Some((w, h, stride, px)) = player.and_then(|p| p.screenshot())
+                    && let Some(img) = win::frame_jpeg(app.hwnd, w, h, stride, &px)
+                {
+                    *frame.lock().unwrap() = Some(img);
                 }
             })
         };
@@ -393,7 +393,7 @@ fn main() {
         .with_window_icon(Icon::from_resource(1, None).ok())
         .build(&event_loop)
         .expect("window");
-    let hwnd = window.hwnd() as isize;
+    let hwnd = window.hwnd();
     win::embed_init(hwnd);
 
     let mut cfg = config::load();

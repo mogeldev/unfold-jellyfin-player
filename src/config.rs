@@ -85,11 +85,11 @@ fn key(acc: &Value) -> Option<String> {
 
 /// Store the token in the Credential Manager; on error fall back to the config file.
 pub fn set_token(acc: &mut Value, token: &str) {
-    if let Some(k) = key(acc) {
-        if cred_write(&format!("{k}@{SERVICE}"), &k, token) {
-            acc.as_object_mut().unwrap().remove("token");
-            return;
-        }
+    if let Some(k) = key(acc)
+        && cred_write(&format!("{k}@{SERVICE}"), &k, token)
+    {
+        acc.as_object_mut().unwrap().remove("token");
+        return;
     }
     acc["token"] = json!(token);
 }
