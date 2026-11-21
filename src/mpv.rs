@@ -25,6 +25,27 @@ struct ClientMessage {
     num_args: c_int,
     args: *const *const c_char,
 }
+#[repr(C)]
+struct Node {
+    u: u64, // union: string / flag / int64 / double / list / byte array
+    format: c_int,
+}
+#[repr(C)]
+struct NodeList {
+    num: c_int,
+    values: *mut Node,
+    keys: *mut *mut c_char,
+}
+#[repr(C)]
+struct ByteArray {
+    data: *mut c_void,
+    size: usize,
+}
+const NODE_STRING: c_int = 1;
+const NODE_INT64: c_int = 4;
+const NODE_ARRAY: c_int = 7;
+const NODE_MAP: c_int = 8;
+const NODE_BYTES: c_int = 9;
 const SHUTDOWN: c_int = 1;
 const END_FILE: c_int = 7;
 const FILE_LOADED: c_int = 8;
@@ -39,6 +60,8 @@ struct Lib {
     set_option_string: unsafe extern "C" fn(Ctx, *const c_char, *const c_char) -> c_int,
     set_property_string: unsafe extern "C" fn(Ctx, *const c_char, *const c_char) -> c_int,
     command: unsafe extern "C" fn(Ctx, *const *const c_char) -> c_int,
+    command_node: unsafe extern "C" fn(Ctx, *mut Node, *mut Node) -> c_int,
+    free_node_contents: unsafe extern "C" fn(*mut Node),
     observe_property: unsafe extern "C" fn(Ctx, u64, *const c_char, c_int) -> c_int,
     wait_event: unsafe extern "C" fn(Ctx, f64) -> *mut Event,
     terminate_destroy: unsafe extern "C" fn(Ctx),
@@ -63,6 +86,8 @@ fn lib() -> Result<&'static Lib, AppError> {
             set_option_string: f!("mpv_set_option_string"),
             set_property_string: f!("mpv_set_property_string"),
             command: f!("mpv_command"),
+            command_node: f!("mpv_command_node"),
+            free_node_contents: f!("mpv_free_node_contents"),
             observe_property: f!("mpv_observe_property"),
             wait_event: f!("mpv_wait_event"),
             terminate_destroy: f!("mpv_terminate_destroy"),
@@ -102,6 +127,48 @@ impl Player {
             if let Ok(l) = lib() {
                 unsafe { (l.command)(*ctx as Ctx, p.as_ptr()) };
             }
+        }
+    }
+
+    /// What the mpv window shows right now (video, letterbox, OSD): (width, height, bytes per row, BGRA pixels).
+    pub fn screenshot(&self) -> Option<(usize, usize, usize, Vec<u8>)> {
+        let ctx = self.ctx.lock().unwrap();
+        if *ctx == 0 {
+            return None;
+        }
+        let l = lib().ok()?;
+        let words = [cs("screenshot-raw"), cs("window")];
+        let mut args: Vec<Node> = words.iter().map(|c| Node { u: c.as_ptr() as u64, format: NODE_STRING }).collect();
+        let mut list = NodeList { num: 2, values: args.as_mut_ptr(), keys: std::ptr::null_mut() };
+        let mut cmd = Node { u: &mut list as *mut NodeList as u64, format: NODE_ARRAY };
+        let mut res = Node { u: 0, format: 0 };
+        unsafe {
+            if (l.command_node)(*ctx as Ctx, &mut cmd, &mut res) < 0 {
+                return None;
+            }
+            let out = (|| {
+                if res.format != NODE_MAP {
+                    return None;
+                }
+                let m = &*(res.u as *const NodeList);
+                let (mut w, mut h, mut stride, mut data) = (0usize, 0usize, 0usize, None);
+                for i in 0..m.num as usize {
+                    let (k, v) = (CStr::from_ptr(*m.keys.add(i)).to_bytes(), &*m.values.add(i));
+                    match (k, v.format) {
+                        (b"w", NODE_INT64) => w = v.u as usize,
+                        (b"h", NODE_INT64) => h = v.u as usize,
+                        (b"stride", NODE_INT64) => stride = v.u as usize,
+                        (b"data", NODE_BYTES) => {
+                            let b = &*(v.u as *const ByteArray);
+                            data = Some(std::slice::from_raw_parts(b.data as *const u8, b.size).to_vec());
+                        }
+                        _ => {}
+                    }
+                }
+                Some((w, h, stride, data?))
+            })();
+            (l.free_node_contents)(&mut res);
+            out
         }
     }
 

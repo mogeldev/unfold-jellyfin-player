@@ -5,11 +5,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::*;
+use webview2_com::Microsoft::Web::WebView2::Win32::{COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_JPEG, ICoreWebView2Controller};
+use webview2_com::CapturePreviewCompletedHandler;
 use windows_sys::w;
 use windows_sys::Win32::Graphics::Dwm::DwmSetWindowAttribute;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::core::BOOL;
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus};
@@ -104,45 +105,75 @@ pub fn fit_width(hwnd: isize, inner_px: i32) {
     }
 }
 
-/// Image of the window's client area (incl. WebView and video) as a JPEG data URL; None if the window is not
-/// in the foreground (the screen grab would include other windows).
-pub fn snapshot(hwnd: isize) -> Option<String> {
-    unsafe {
-        if GetForegroundWindow() != h(hwnd) {
-            return None;
-        }
-        let mut c: RECT = std::mem::zeroed();
-        GetClientRect(h(hwnd), &mut c);
-        let mut pt = POINT { x: 0, y: 0 };
-        ClientToScreen(h(hwnd), &mut pt);
-        let (w, hg) = (c.right, c.bottom);
-        if w <= 0 || hg <= 0 || w > 65535 || hg > 65535 {
-            return None;
-        }
-        let screen = GetDC(std::ptr::null_mut());
-        let mem = CreateCompatibleDC(screen);
-        let mut bi: BITMAPINFO = std::mem::zeroed();
-        bi.bmiHeader = BITMAPINFOHEADER {
-            biSize: size_of::<BITMAPINFOHEADER>() as u32, biWidth: w, biHeight: -hg, // negative: top-down rows
-            biPlanes: 1, biBitCount: 32, biCompression: BI_RGB, ..std::mem::zeroed()
-        };
-        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
-        let bmp = CreateDIBSection(mem, &bi, DIB_RGB_COLORS, &mut bits, std::ptr::null_mut(), 0);
-        let old = SelectObject(mem, bmp);
-        let ok = BitBlt(mem, 0, 0, w, hg, screen, pt.x, pt.y, SRCCOPY) != 0;
-        let px = std::slice::from_raw_parts(bits as *const u8, (w * hg * 4) as usize).to_vec();
-        SelectObject(mem, old);
-        DeleteObject(bmp);
-        DeleteDC(mem);
-        ReleaseDC(std::ptr::null_mut(), screen);
-        if !ok {
-            return None;
-        }
-        // JPEG: much faster and smaller than PNG, good enough for the page turn
-        let mut out = Vec::new();
-        jpeg_encoder::Encoder::new(&mut out, 85).encode(&px, w as u16, hg as u16, jpeg_encoder::ColorType::Bgra).ok()?;
-        Some(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(out)))
+/// Image of the page (WebView2 renders it itself, no screen grab) as a JPEG data URL for the page turn.
+/// Must run on the UI thread; the result arrives on `tx` once WebView2 is done.
+pub fn capture_page(ctrl: &ICoreWebView2Controller, tx: std::sync::mpsc::Sender<Option<String>>) {
+    use windows::Win32::System::Com::{IStream, STREAM_SEEK_SET};
+    use windows::Win32::UI::Shell::SHCreateMemStream;
+    let started = (|| unsafe {
+        let stream: IStream = SHCreateMemStream(None).ok_or_else(windows::core::Error::from_thread)?;
+        let (s2, tx2) = (stream.clone(), tx.clone());
+        let handler = CapturePreviewCompletedHandler::create(Box::new(move |r| {
+            let jpg = r.ok().and_then(|_| {
+                s2.Seek(0, STREAM_SEEK_SET, None).ok()?;
+                let (mut out, mut buf) = (Vec::new(), vec![0u8; 1 << 16]);
+                loop {
+                    let mut n = 0u32;
+                    s2.Read(buf.as_mut_ptr() as _, buf.len() as u32, Some(&mut n)).ok().ok()?;
+                    if n == 0 {
+                        break Some(out);
+                    }
+                    out.extend_from_slice(&buf[..n as usize]);
+                }
+            });
+            let _ = tx2.send(jpg.map(|b| format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(b))));
+            Ok(())
+        }));
+        ctrl.CoreWebView2()?.CapturePreview(COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_JPEG, &stream, &handler)
+    })();
+    if started.is_err() {
+        let _ = tx.send(None);
     }
+}
+
+/// Video frame from mpv (BGRA, `stride` bytes per row, window area below the bar) placed into an image of the
+/// whole client area (bar colour above, black elsewhere) as a JPEG data URL, so it fits the page turn like the page image.
+pub fn frame_jpeg(hwnd: isize, w: usize, ht: usize, stride: usize, px: &[u8]) -> Option<String> {
+    let mut c: RECT = unsafe { std::mem::zeroed() };
+    unsafe { GetClientRect(h(hwnd), &mut c) };
+    let (cw, ch) = (c.right as usize, c.bottom as usize);
+    if cw == 0 || ch == 0 || cw > 65535 || ch > 65535 || w == 0 || ht == 0 || px.len() < stride * (ht - 1) + w * 4 {
+        return None;
+    }
+    let top = ch.saturating_sub(ht);
+    let mut img = vec![0u8; cw * ch * 4];
+    if top > 0 {
+        unsafe {
+            let g = EMBED.lock().unwrap();
+            let e = g.as_ref()?;
+            let dc = CreateCompatibleDC(std::ptr::null_mut());
+            let mut bi: BITMAPINFO = std::mem::zeroed();
+            bi.bmiHeader = BITMAPINFOHEADER {
+                biSize: size_of::<BITMAPINFOHEADER>() as u32, biWidth: cw as i32, biHeight: -(top as i32), // top-down rows
+                biPlanes: 1, biBitCount: 32, biCompression: BI_RGB, ..std::mem::zeroed()
+            };
+            let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
+            let bmp = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &mut bits, std::ptr::null_mut(), 0);
+            let old = SelectObject(dc, bmp);
+            paint_bar(dc, h(e.host), RECT { left: 0, top: 0, right: cw as i32, bottom: top as i32 }, e);
+            img[..cw * top * 4].copy_from_slice(std::slice::from_raw_parts(bits as *const u8, cw * top * 4));
+            SelectObject(dc, old);
+            DeleteObject(bmp);
+            DeleteDC(dc);
+        }
+    }
+    for y in 0..ht.min(ch - top) {
+        let n = w.min(cw) * 4;
+        img[((top + y) * cw) * 4..][..n].copy_from_slice(&px[y * stride..][..n]);
+    }
+    let mut out = Vec::new();
+    jpeg_encoder::Encoder::new(&mut out, 85).encode(&img, cw as u16, ch as u16, jpeg_encoder::ColorType::Bgra).ok()?;
+    Some(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(out)))
 }
 
 /// mpv creates its embedded window disabled (WS_DISABLED), so neither mouse (OSC) nor keys arrive.
@@ -159,10 +190,6 @@ pub fn enable_input(wid: isize) {
             EnumChildWindows(h(wid), Some(first), &mut kid as *mut HWND as LPARAM);
             if !kid.is_null() {
                 EnableWindow(kid, 1);
-                let (me, there) = (GetCurrentThreadId(), GetWindowThreadProcessId(kid, std::ptr::null_mut()));
-                AttachThreadInput(me, there, 1); // SetFocus only works within the own input queue
-                SetFocus(kid);
-                AttachThreadInput(me, there, 0);
                 return;
             }
         }
@@ -181,11 +208,29 @@ struct Embed {
     label: Vec<u16>,
     bar: bool,
     on_back: Option<Arc<dyn Fn() + Send + Sync>>,
+    on_key: Option<Arc<dyn Fn(&str) + Send + Sync>>,
 }
 static EMBED: Mutex<Option<Embed>> = Mutex::new(None);
 
 fn scale(hwnd: HWND, px: i32) -> i32 {
     px * unsafe { GetDpiForWindow(hwnd) } as i32 / 96
+}
+
+/// The bar with the back label into r (used for the window and for the frame of the page turn).
+unsafe fn paint_bar(dc: HDC, hw: HWND, mut r: RECT, e: &Embed) {
+    unsafe {
+        let brush = CreateSolidBrush(e.bg);
+        FillRect(dc, &r, brush);
+        DeleteObject(brush);
+        let font = CreateFontW(-scale(hw, 12), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, w!("Segoe UI"));
+        let old = SelectObject(dc, font);
+        SetTextColor(dc, e.fg);
+        SetBkMode(dc, TRANSPARENT as i32);
+        r.right = scale(hw, 130);
+        DrawTextW(dc, e.label.as_ptr(), -1, &mut r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(dc, old);
+        DeleteObject(font);
+    }
 }
 
 unsafe extern "system" fn host_proc(hw: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
@@ -201,17 +246,7 @@ unsafe extern "system" fn host_proc(hw: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
                     let mut r: RECT = std::mem::zeroed();
                     GetClientRect(hw, &mut r);
                     r.bottom = bar_h;
-                    let brush = CreateSolidBrush(e.bg);
-                    FillRect(dc, &r, brush);
-                    DeleteObject(brush);
-                    let font = CreateFontW(-scale(hw, 12), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, w!("Segoe UI"));
-                    let old = SelectObject(dc, font);
-                    SetTextColor(dc, e.fg);
-                    SetBkMode(dc, TRANSPARENT as i32);
-                    r.right = btn_w;
-                    DrawTextW(dc, e.label.as_ptr(), -1, &mut r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-                    SelectObject(dc, old);
-                    DeleteObject(font);
+                    paint_bar(dc, hw, r, e);
                 }
                 EndPaint(hw, &ps);
                 0
@@ -225,6 +260,26 @@ unsafe extern "system" fn host_proc(hw: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
                     return 1;
                 }
                 DefWindowProcW(hw, msg, wp, lp)
+            }
+            // Until the user clicks into the video, mpv's window has no keyboard focus (it lives in another input
+            // queue): the panel holds it and passes keys on, so Esc, space and the arrows work from the start
+            WM_KEYDOWN | WM_CHAR => {
+                let key = match (msg, wp as u32) {
+                    (WM_KEYDOWN, 0x1B) => Some("ESC".to_string()),
+                    (WM_KEYDOWN, 0x0D) => Some("ENTER".into()),
+                    (WM_KEYDOWN, 0x25) => Some("LEFT".into()),
+                    (WM_KEYDOWN, 0x26) => Some("UP".into()),
+                    (WM_KEYDOWN, 0x27) => Some("RIGHT".into()),
+                    (WM_KEYDOWN, 0x28) => Some("DOWN".into()),
+                    (WM_CHAR, 0x20) => Some("SPACE".into()),
+                    (WM_CHAR, c) if c > 0x20 => char::from_u32(c).map(String::from),
+                    _ => None,
+                };
+                let cb = EMBED.lock().unwrap().as_ref().and_then(|e| e.on_key.clone());
+                if let (Some(k), Some(f)) = (key, cb) {
+                    f(&k);
+                }
+                0
             }
             WM_LBUTTONUP => {
                 let (x, y) = ((lp & 0xFFFF) as i16 as i32, ((lp >> 16) & 0xFFFF) as i16 as i32);
@@ -259,7 +314,7 @@ pub fn embed_init(parent: isize) {
             0, 0, 0, 0, host, std::ptr::null_mut(), inst, std::ptr::null());
         *EMBED.lock().unwrap() = Some(Embed {
             parent, host: host as isize, video: video as isize, bg: colorref((11, 15, 11)), fg: colorref((182, 242, 182)),
-            label: "←  Back".encode_utf16().chain(Some(0)).collect(), bar: true, on_back: None,
+            label: "←  Back".encode_utf16().chain(Some(0)).collect(), bar: true, on_back: None, on_key: None,
         });
     }
 }
@@ -278,7 +333,8 @@ pub fn embed_layout() {
 }
 
 /// Show the panel (bar colours and label come from the frontend) and return the HWND of the video area.
-pub fn embed_show(bg: Option<&str>, fg: Option<&str>, back: Option<&str>, bar: bool, on_back: Arc<dyn Fn() + Send + Sync>) -> Option<isize> {
+pub fn embed_show(bg: Option<&str>, fg: Option<&str>, back: Option<&str>, bar: bool, on_back: Arc<dyn Fn() + Send + Sync>,
+    on_key: Arc<dyn Fn(&str) + Send + Sync>) -> Option<isize> {
     let (host, video) = {
         let mut g = EMBED.lock().unwrap();
         let e = g.as_mut()?;
@@ -289,6 +345,7 @@ pub fn embed_show(bg: Option<&str>, fg: Option<&str>, back: Option<&str>, bar: b
         }
         e.bar = bar;
         e.on_back = Some(on_back);
+        e.on_key = Some(on_key);
         (e.host, e.video)
     };
     embed_layout();
@@ -304,9 +361,18 @@ pub fn embed_set_bar(visible: bool) {
     embed_layout();
 }
 
+/// Keyboard focus to the player panel (UI thread only); see WM_KEYDOWN in host_proc.
+pub fn embed_focus() {
+    let host = EMBED.lock().unwrap().as_ref().map(|e| e.host);
+    if let Some(host) = host {
+        unsafe { SetFocus(h(host)) };
+    }
+}
+
 pub fn embed_hide() {
     let host = EMBED.lock().unwrap().as_mut().map(|e| {
         e.on_back = None;
+        e.on_key = None;
         e.host
     });
     if let Some(host) = host {

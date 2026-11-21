@@ -21,7 +21,7 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tao::platform::windows::{IconExtWindows, WindowExtWindows};
 use tao::window::{Fullscreen, Icon, WindowBuilder};
 use wry::http::{Request, Response};
-use wry::{WebContext, WebViewBuilder};
+use wry::{WebContext, WebViewBuilder, WebViewExtWindows};
 
 const TITLE: &str = "Unfold – Jellyfin Player";
 const METHODS: &[&str] = &[
@@ -32,6 +32,7 @@ const METHODS: &[&str] = &[
 enum Ev {
     Eval(String),
     ToggleFs,
+    Snapshot(mpsc::Sender<Option<String>>), // image of the page (WebView2 renders it, UI thread only)
     ShowWeb(bool), // WebView2 is composited above the GDI-painted player panel: hide it while the panel is up
 }
 
@@ -191,7 +192,12 @@ impl App {
                 self.send(Ev::ToggleFs);
                 Value::Null
             }
-            "snapshot" => json!(win::snapshot(self.hwnd)), // image of the UI for the page turn
+            "snapshot" => {
+                // image of the UI for the page turn
+                let (tx, rx) = mpsc::channel();
+                self.send(Ev::Snapshot(tx));
+                json!(rx.recv_timeout(Duration::from_secs(3)).ok().flatten())
+            }
             "fit_window" => {
                 let (hwnd, px) = (self.hwnd, arg_i(a, 0) as i32);
                 std::thread::spawn(move || win::fit_width(hwnd, px)); // the animation runs in the background
@@ -269,10 +275,11 @@ impl App {
         // Embedded (default); otherwise mpv plays in its own window
         let embed = self.cfg.lock().unwrap()["embed"].as_bool().unwrap_or(true);
         let wid = embed.then(|| {
-            let slot = slot.clone();
+            let (slot_back, slot_key) = (slot.clone(), slot.clone());
             // if the app is already fullscreen, the video starts fullscreen too (bar hidden)
             win::embed_show(colors["bg"].as_str(), colors["fg"].as_str(), colors["back"].as_str(), !self.fs.load(Ordering::SeqCst),
-                Arc::new(move || if let Some(p) = slot.lock().unwrap().clone() { p.back() }))
+                Arc::new(move || if let Some(p) = slot_back.lock().unwrap().clone() { p.back() }),
+                Arc::new(move |key: &str| if let Some(p) = slot_key.lock().unwrap().clone() { p.command(&["keypress", key]) }))
         }).flatten();
         if wid.is_some() {
             self.send(Ev::ShowWeb(false));
@@ -280,10 +287,13 @@ impl App {
 
         // Keep the video frame for the page turn back; after mpv quits the window would be black, so grab it before
         let grab = {
-            let (app, frame) = (self.clone(), frame.clone());
-            Arc::new(move || if wid.is_some() {
-                if let Some(img) = win::snapshot(app.hwnd) {
-                    *frame.lock().unwrap() = Some(img);
+            let (app, frame, slot) = (self.clone(), frame.clone(), slot.clone());
+            Arc::new(move || {
+                let player = slot.lock().unwrap().clone();
+                if let Some((w, h, stride, px)) = player.and_then(|p| p.screenshot()) {
+                    if let Some(img) = win::frame_jpeg(app.hwnd, w, h, stride, &px) {
+                        *frame.lock().unwrap() = Some(img);
+                    }
                 }
             })
         };
@@ -459,8 +469,11 @@ fn main() {
             Event::UserEvent(Ev::Eval(js)) => {
                 let _ = webview.evaluate_script(&js);
             }
+            Event::UserEvent(Ev::Snapshot(tx)) => win::capture_page(&webview.controller(), tx),
             Event::UserEvent(Ev::ShowWeb(on)) => {
                 let _ = webview.set_visible(on);
+                // the hidden page would keep the keyboard focus: the player panel takes it (keys go on to mpv), or give it back
+                if on { let _ = webview.focus(); } else { win::embed_focus(); }
             }
             Event::UserEvent(Ev::ToggleFs) => {
                 // fullscreen of the app window (library and playback); the bar of the embedded player follows it
