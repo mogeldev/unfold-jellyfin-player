@@ -42,13 +42,15 @@
   const subFmt = s => SUB[(s.Codec || '').toLowerCase()];
   // Like streams() in src/jellyfin.rs: track names per type (embedded subtitles first, then the external text ones that mpv
   // loads afterwards, 'Off' last), the external subtitle streams and the MediaSourceId
-  function streams(d) {
-    const src = (d.MediaSources || [{}])[0], all = src.MediaStreams || d.MediaStreams || [];
+  function streams(d, ver = 0) {
+    const srcs = d.MediaSources?.length ? d.MediaSources : [{}], n = Math.min(+ver || 0, srcs.length - 1), src = srcs[n];
+    const all = src.MediaStreams || d.MediaStreams || [];
     const name = s => s.DisplayTitle || s.Title || s.Language || '?';
     const of = (type, f = () => true) => all.filter(s => s.Type === type && f(s));
     const ext = of('Subtitle', s => s.IsExternal && subFmt(s));
     return { ext, msId: src.Id || d.Id, st: { v: of('Video').map(name), a: of('Audio').map(name),
-      s: [...of('Subtitle', s => !s.IsExternal), ...ext].map(name).concat('Off') } };
+      s: [...of('Subtitle', s => !s.IsExternal), ...ext].map(name).concat('Off'), ver: n,
+      ...(srcs.length > 1 ? { vers: srcs.map((x, i) => x.Name || `Version ${i + 1}`) } : {}) } };
   }
 
   const api = {
@@ -93,9 +95,9 @@
       }
       return { ...base, type: 'series', seasons: [...seasons].sort((x, y) => x[0] - y[0]).map(([n, eps]) => ({ n, eps: eps.sort((x, y) => x.n - y.n) })) };
     },
-    tracks: async id => streams(await detail(id)).st,
-    async play(id, v, a, sub) {
-      const acct = need(), d = await detail(id), { st, ext, msId } = streams(d);
+    tracks: async (id, ver) => streams(await detail(id), ver).st,
+    async play(id, v, a, sub, _colors, ver) {
+      const acct = need(), d = await detail(id), { st, ext, msId } = streams(d, ver);
       const psid = (await req(acct, 'POST', `/Items/${id}/PlaybackInfo`, { UserId: acct.user_id }, { UserId: acct.user_id })).PlaySessionId;
       const url = `${acct.server}/Videos/${id}/stream?` + new URLSearchParams({ static: 'true', MediaSourceId: msId, PlaySessionId: psid, DeviceId: acct.device_id, api_key: acct.token });
       const resume = Math.round((d.UserData?.PlaybackPositionTicks || 0) / MS), runtime = d.RunTimeTicks;

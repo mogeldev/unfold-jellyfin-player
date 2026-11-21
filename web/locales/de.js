@@ -5,7 +5,7 @@
   episodes: 'Episoden', season: 'Staffel {n}', seasons_one: '{n} Staffel', seasons_other: '{n} Staffeln',
   search: 'Suche', search_placeholder: 'Suchen …', no_results: 'Keine Treffer',
   series: 'Serie', watched: '✓ gesehen', min: 'min',
-  video: 'Video', audio: 'Audio', subtitles: 'Untertitel', subs_off: 'Aus',
+  version: 'Version', video: 'Video', audio: 'Audio', subtitles: 'Untertitel', subs_off: 'Aus',
   play: '▶ Abspielen', play_note: 'Spielt mit mpv ab. Alle Spuren sind währenddessen wählbar, Start mit obiger Auswahl.',
   back: '←  Zurück',
   protocol: 'Protokoll', server: 'Server', port: 'Port', user: 'Benutzer', password: 'Passwort',

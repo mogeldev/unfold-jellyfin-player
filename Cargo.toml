@@ -1,6 +1,6 @@
 [package]
 name = "unfold"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 description = "Unfold – Jellyfin Player: column-based Jellyfin client with embedded mpv (Windows)"
 license = "MIT"

@@ -5,7 +5,7 @@
   episodes: 'Episodios', season: 'Temporada {n}', seasons_one: '{n} temporada', seasons_other: '{n} temporadas',
   search: 'Búsqueda', search_placeholder: 'Buscar…', no_results: 'Sin resultados',
   series: 'Serie', watched: '✓ visto', min: 'min',
-  video: 'Vídeo', audio: 'Audio', subtitles: 'Subtítulos', subs_off: 'Desactivados',
+  version: 'Versión', video: 'Vídeo', audio: 'Audio', subtitles: 'Subtítulos', subs_off: 'Desactivados',
   play: '▶ Reproducir', play_note: 'Se reproduce con mpv. Todas las pistas se pueden cambiar durante la reproducción; empieza con la selección de arriba.',
   back: '←  Volver',
   protocol: 'Protocolo', server: 'Servidor', port: 'Puerto', user: 'Usuario', password: 'Contraseña',

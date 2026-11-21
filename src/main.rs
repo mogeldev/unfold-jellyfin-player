@@ -213,13 +213,13 @@ impl App {
                 if term.is_empty() { json!([]) } else { json!(self.need()?.search(&term)?.iter().map(summary).collect::<Vec<_>>()) }
             }
             "detail" => self.detail(&arg_s(a, 0))?,
-            "tracks" => streams(&self.need()?.detail(&arg_s(a, 0))?).0, // one episode's tracks, loaded when it is selected
+            "tracks" => streams(&self.need()?.detail(&arg_s(a, 0))?, arg_i(a, 1).max(0) as usize).0, // tracks of one version, loaded when selected
             "play" => {
                 if self.playing.swap(true, Ordering::SeqCst) {
                     return Ok(json!({})); // already playing or starting: ignore
                 }
                 // the lock is released when mpv stops, or here if starting fails
-                self.play(&arg_s(a, 0), arg_i(a, 1), arg_i(a, 2), arg_i(a, 3), a.get(4).cloned().unwrap_or(Value::Null))
+                self.play(&arg_s(a, 0), arg_i(a, 1), arg_i(a, 2), arg_i(a, 3), a.get(4).cloned().unwrap_or(Value::Null), arg_i(a, 5).max(0) as usize)
                     .inspect_err(|_| self.playing.store(false, Ordering::SeqCst))?
             }
             _ => return Err(AppError::Other(format!("AttributeError: no method {m}"))),
@@ -233,7 +233,7 @@ impl App {
             "ov": text(d["Overview"].as_str().unwrap_or("")), "poster": jf.poster_url(&d), "seen": seen(&d), "min": minutes(&d)});
         if d["Type"] != "Series" {
             base["type"] = json!("movie");
-            base["st"] = streams(&d).0;
+            base["st"] = streams(&d, 0).0;
             return Ok(base);
         }
         let mut seasons: std::collections::BTreeMap<i64, Vec<Value>> = Default::default();
@@ -249,10 +249,10 @@ impl App {
         Ok(base)
     }
 
-    fn play(self: &Arc<Self>, item_id: &str, v: i64, a: i64, s: i64, colors: Value) -> Res<Value> {
+    fn play(self: &Arc<Self>, item_id: &str, v: i64, a: i64, s: i64, colors: Value, ver: usize) -> Res<Value> {
         let jf = self.need()?;
         let dto = jf.detail(item_id)?;
-        let (st, ms_id) = streams(&dto);
+        let (st, ms_id) = streams(&dto, ver);
         let psid = jf.playback_info(item_id)?["PlaySessionId"].as_str().unwrap_or("").to_string();
         let url = jf.stream_url(item_id, &ms_id, &psid);
         let resume = dto["UserData"]["PlaybackPositionTicks"].as_f64().unwrap_or(0.0) / TICKS;
@@ -263,7 +263,7 @@ impl App {
         let aid = (n("a") > 0).then(|| (a + 1).to_string());
         let sid = (n("s") > 1).then(|| if s == n("s") - 1 { "no".to_string() } else { (s + 1).to_string() });
         // External text subtitles come after the embedded ones and are loaded from the server by mpv
-        let sub_files = external_subs(&dto).iter().map(|(i, f)| jf.subtitle_url(item_id, &ms_id, *i, f)).collect();
+        let sub_files = external_subs(&dto, ver).iter().map(|(i, f)| jf.subtitle_url(item_id, &ms_id, *i, f)).collect();
         let mut title = dto["Name"].as_str().unwrap_or("").to_string();
         if dto["Type"] == "Episode" {
             title = format!("{} S{}E{} {title}", dto["SeriesName"].as_str().unwrap_or(""),

@@ -5,7 +5,7 @@
   episodes: '劇集', season: '第 {n} 季', seasons_other: '{n} 季',
   search: '搜尋', search_placeholder: '搜尋…', no_results: '沒有結果',
   series: '影集', watched: '✓ 已觀看', min: '分鐘',
-  video: '影片', audio: '音訊', subtitles: '字幕', subs_off: '關閉',
+  version: '版本', video: '影片', audio: '音訊', subtitles: '字幕', subs_off: '關閉',
   play: '▶ 播放', play_note: '使用 mpv 播放。播放期間可隨時切換所有音軌和字幕，開始時使用上方的選擇。',
   back: '←  返回',
   protocol: '通訊協定', server: '伺服器', port: '連接埠', user: '使用者名稱', password: '密碼',

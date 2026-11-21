@@ -5,7 +5,7 @@
   episodes: '剧集', season: '第 {n} 季', seasons_other: '{n} 季',
   search: '搜索', search_placeholder: '搜索…', no_results: '无结果',
   series: '电视剧', watched: '✓ 已观看', min: '分钟',
-  video: '视频', audio: '音频', subtitles: '字幕', subs_off: '关闭',
+  version: '版本', video: '视频', audio: '音频', subtitles: '字幕', subs_off: '关闭',
   play: '▶ 播放', play_note: '使用 mpv 播放。播放期间可随时切换所有音轨和字幕，开始时使用上方的选择。',
   back: '←  返回',
   protocol: '协议', server: '服务器', port: '端口', user: '用户名', password: '密码',

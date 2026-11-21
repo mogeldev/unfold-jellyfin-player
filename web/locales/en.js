@@ -5,7 +5,7 @@
   episodes: 'Episodes', season: 'Season {n}', seasons_one: '{n} season', seasons_other: '{n} seasons',
   search: 'Search', search_placeholder: 'Search…', no_results: 'No results',
   series: 'Series', watched: '✓ watched', min: 'min',
-  video: 'Video', audio: 'Audio', subtitles: 'Subtitles', subs_off: 'Off',
+  version: 'Version', video: 'Video', audio: 'Audio', subtitles: 'Subtitles', subs_off: 'Off',
   play: '▶ Play', play_note: 'Plays in mpv. All tracks stay selectable during playback; starts with the selection above.',
   back: '←  Back',
   protocol: 'Protocol', server: 'Server', port: 'Port', user: 'User', password: 'Password',

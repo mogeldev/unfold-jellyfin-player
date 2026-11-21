@@ -1,6 +1,6 @@
 ; Inno Setup script. Needs dist\Unfold (tools\build.ps1). Build with tools\make_installer.ps1
 #define AppName "Unfold – Jellyfin Player"
-#define AppVersion "0.5.1"
+#define AppVersion "0.5.2"
 
 [Setup]
 AppId={{A3F1C2D4-5B6E-4789-8A0B-1C2D3E4F5A6B}

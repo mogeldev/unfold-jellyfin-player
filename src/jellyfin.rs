@@ -202,26 +202,36 @@ fn sub_format(s: &Value) -> Option<&'static str> {
     }
 }
 
-fn media_streams(dto: &Value) -> Vec<Value> {
-    let src = &dto["MediaSources"][0]["MediaStreams"];
+/// Number of versions of the title (2160p, 1080p …), at least 1.
+fn versions(dto: &Value) -> usize {
+    dto["MediaSources"].as_array().map_or(1, |a| a.len().max(1))
+}
+
+/// Media source (version) `ver`; an unknown index falls back to the last one.
+fn source(dto: &Value, ver: usize) -> &Value {
+    &dto["MediaSources"][ver.min(versions(dto) - 1)]
+}
+
+fn media_streams(dto: &Value, ver: usize) -> Vec<Value> {
+    let src = &source(dto, ver)["MediaStreams"];
     let s = if src.is_array() { src } else { &dto["MediaStreams"] };
     s.as_array().cloned().unwrap_or_default()
 }
 
 /// External text subtitles in order: (Jellyfin stream index, "srt"|"ass"|"vtt").
-pub fn external_subs(dto: &Value) -> Vec<(i64, &'static str)> {
-    media_streams(dto)
+pub fn external_subs(dto: &Value, ver: usize) -> Vec<(i64, &'static str)> {
+    media_streams(dto, ver)
         .iter()
         .filter(|s| s["Type"] == "Subtitle" && s["IsExternal"] == true)
         .filter_map(|s| Some((s["Index"].as_i64()?, sub_format(s)?)))
         .collect()
 }
 
-/// Track names per type and the MediaSourceId. Subtitles: embedded ones first (mpv order), then the
-/// external ones (loaded by mpv afterwards); "Off" is always the last subtitle entry.
-pub fn streams(dto: &Value) -> (Value, String) {
+/// Track names per type of version `ver` and its MediaSourceId; "vers" lists the versions when there are several.
+/// Subtitles: embedded ones first (mpv order), then the external ones (loaded by mpv afterwards); "Off" is always last.
+pub fn streams(dto: &Value, ver: usize) -> (Value, String) {
     let (mut v, mut a, mut s, mut ext) = (vec![], vec![], vec![], vec![]);
-    for st in media_streams(dto) {
+    for st in media_streams(dto, ver) {
         let name = ["DisplayTitle", "Title", "Language"]
             .iter()
             .find_map(|k| st[*k].as_str().filter(|x| !x.is_empty()))
@@ -237,8 +247,14 @@ pub fn streams(dto: &Value) -> (Value, String) {
     }
     s.extend(ext);
     s.push("Off".into()); // the frontend shows its own translation (subs_off)
-    let ms_id = dto["MediaSources"][0]["Id"].as_str().or(dto["Id"].as_str()).unwrap_or_default().to_string();
-    (json!({"v": v, "a": a, "s": s}), ms_id)
+    let ms_id = source(dto, ver)["Id"].as_str().or(dto["Id"].as_str()).unwrap_or_default().to_string();
+    let mut st = json!({"v": v, "a": a, "s": s, "ver": ver.min(versions(dto) - 1)});
+    if versions(dto) > 1 {
+        st["vers"] = json!((0..versions(dto))
+            .map(|i| source(dto, i)["Name"].as_str().filter(|n| !n.is_empty()).map_or(format!("Version {}", i + 1), String::from))
+            .collect::<Vec<_>>());
+    }
+    (st, ms_id)
 }
 
 pub fn minutes(dto: &Value) -> i64 {
@@ -279,9 +295,17 @@ mod tests {
             {"Type": "Subtitle", "IsExternal": true, "Codec": "subrip", "Index": 5, "Language": "de"},
             {"Type": "Subtitle", "IsExternal": true, "Codec": "pgssub", "Index": 6},
             {"Type": "Subtitle", "Title": "en"}]}]});
-        let (st, ms) = streams(&dto);
+        let (st, ms) = streams(&dto, 0);
         assert_eq!(ms, "m");
-        assert_eq!(st, json!({"v": ["1080p"], "a": [], "s": ["en", "de", "Off"]}));
-        assert_eq!(external_subs(&dto), vec![(5, "srt")]);
+        assert_eq!(st, json!({"v": ["1080p"], "a": [], "s": ["en", "de", "Off"], "ver": 0}));
+        assert_eq!(external_subs(&dto, 0), vec![(5, "srt")]);
+        // two versions: each has its own streams, an out-of-range index falls back to the last one
+        let two = json!({"Id": "x", "MediaSources": [
+            {"Id": "a", "Name": "2160p", "MediaStreams": [{"Type": "Audio", "Title": "de"}]},
+            {"Id": "b", "Name": "", "MediaStreams": [{"Type": "Audio", "Title": "en"}]}]});
+        let (st, ms) = streams(&two, 1);
+        assert_eq!((ms.as_str(), &st["a"], &st["vers"]), ("b", &json!(["en"]), &json!(["2160p", "Version 2"])));
+        assert_eq!(streams(&two, 9).1, "b");
+        assert_eq!(streams(&two, 0).0["ver"], 0);
     }
 }

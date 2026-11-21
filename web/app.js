@@ -146,9 +146,9 @@
   // Search: runs across all libraries, results appear in column 2 instead of the library list
   let searchOn = false, query = '', searching = false, focusSearch = false, searchToken = 0, searchTimer;
   let letter = null; // active letter filter ('0-9', 'A'…'Z', '…') in the library list
-  let libs = [], lib = -1, items = [], it = null, si = 0, ei = 0, sel = { v: 0, a: 0, s: 0 };
+  let libs = [], lib = -1, items = [], it = null, si = 0, ei = 0, sel = { ver: 0, v: 0, a: 0, s: 0 };
   const target = () => it.type === 'movie' ? it : it.seasons[si].eps[ei];
-  const resetSel = () => { sel = { v: 0, a: 0, s: 0 }; };
+  const resetSel = () => { sel = { ver: 0, v: 0, a: 0, s: 0 }; };
   function pick() {
     si = 0; ei = 0; resetSel();
     if (it.type !== 'series') return;
@@ -156,8 +156,8 @@
       for (let e = 0; e < it.seasons[s].eps.length; e++)
         if (!it.seasons[s].eps[e].seen) { si = s; ei = e; break outer; }
   }
-  // Episodes come without tracks (long series stay fast): load them for the selected episode
-  const ensureTracks = async () => { const c = target(); if (!c.st) c.st = await call('tracks', c.id); };
+  // Episodes come without tracks (long series stay fast): load them for the selected episode; also for another version of the title
+  const ensureTracks = async () => { const c = target(); if (c.st?.ver !== sel.ver) c.st = await call('tracks', c.id, sel.ver); };
   const selectItem = guard(async i => { it = await call('detail', items[i].id); pick(); await ensureTracks(); render(); });
   const selectLib = guard(async i => {
     searchOn = false; query = ''; searchToken++; letter = null;
@@ -317,10 +317,10 @@
         `<a class="item${a === si && b === ei ? ' on' : ''}${e.seen ? ' seen' : ''}" data-ep="${a}.${b}"><span>${e.seen ? '✓' : '○'} ${esc(e.n)}. ${esc(e.t)}</span><span class="meta">${esc(e.min)} ${t('min')}</span></a>`).join('')).join('');
     const title = it.type === 'movie' ? it.name : `S${it.seasons[si].n}E${cur.n} · ${cur.t}`;
     // 'subs_off': the last subtitle entry is always “Off”, the text comes from the language file
-    const list = (k, label) => `<div class="h">${label}</div>` + (cur.st?.[k] || []).map((n, i, arr) =>
+    const list = (k, label) => `<div class="h">${label}</div>` + (k === 'ver' ? cur.st.vers : cur.st?.[k] || []).map((n, i, arr) =>
       `<a class="item${sel[k] === i ? ' on' : ''}" data-st="${k}.${i}"><span>${esc(k === 's' && i === arr.length - 1 ? t('subs_off') : n)}</span><span class="mark">${sel[k] === i ? '●' : ''}</span></a>`).join('');
     const c5 = `<div class="d"><h1>${esc(title)}</h1><div class="meta">${it.type === 'series' ? esc(it.name) + ' · ' : ''}${esc(cur.min)} ${t('min')}</div></div>` +
-      list('v', t('video')) + list('a', t('audio')) + list('s', t('subtitles')) +
+      (cur.st?.vers ? list('ver', t('version')) : '') + list('v', t('video')) + list('a', t('audio')) + list('s', t('subtitles')) +
       `<div class="foot"><button class="play" data-play>${t('play')}</button><div class="note">${t('play_note')}</div></div>`;
     commit([[1, c1], [2, c2], [3, c3], ...(it.type === 'series' ? [[4, c4]] : []), [5, c5]]);
   }
@@ -481,7 +481,11 @@
     else if ((x = q('lib'))) return selectLib(+x.dataset.lib);
     else if ((x = q('item'))) return selectItem(+x.dataset.item);
     else if ((x = q('ep'))) { [si, ei] = x.dataset.ep.split('.').map(Number); resetSel(); await ensureTracks(); }
-    else if ((x = q('st'))) { const [k, i] = x.dataset.st.split('.'); sel[k] = +i; }
+    else if ((x = q('st'))) {
+      const [k, i] = x.dataset.st.split('.');
+      if (k === 'ver') { resetSel(); sel.ver = +i; await ensureTracks(); } // another version has its own tracks
+      else sel[k] = +i;
+    }
     else if ((x = q('act'))) {
       if (x.dataset.act === 'search') { openSearch(); return; }
       if (x.dataset.act === 'help') { help(); return; }
@@ -519,7 +523,7 @@
       const flip = s.can_embed && s.embed; // embedded: the UI turns like a book page, the video appears behind it
       if (flip) await pageOut();
       let r;
-      try { r = await call('play', target().id, sel.v, sel.a, sel.s, { bg: cs.backgroundColor, fg: cs.color, back: t('back') }); }
+      try { r = await call('play', target().id, sel.v, sel.a, sel.s, { bg: cs.backgroundColor, fg: cs.color, back: t('back') }, sel.ver); }
       catch (err) { await pageBack(); throw err; }
       say(r.cmd || t('mpv_started'));
       return;

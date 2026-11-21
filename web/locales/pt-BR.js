@@ -5,7 +5,7 @@
   episodes: 'Episódios', season: 'Temporada {n}', seasons_one: '{n} temporada', seasons_other: '{n} temporadas',
   search: 'Busca', search_placeholder: 'Buscar…', no_results: 'Nenhum resultado',
   series: 'Série', watched: '✓ assistido', min: 'min',
-  video: 'Vídeo', audio: 'Áudio', subtitles: 'Legendas', subs_off: 'Desativadas',
+  version: 'Versão', video: 'Vídeo', audio: 'Áudio', subtitles: 'Legendas', subs_off: 'Desativadas',
   play: '▶ Reproduzir', play_note: 'Reproduz no mpv. Todas as faixas podem ser trocadas durante a reprodução; começa com a seleção acima.',
   back: '←  Voltar',
   protocol: 'Protocolo', server: 'Servidor', port: 'Porta', user: 'Usuário', password: 'Senha',

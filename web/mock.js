@@ -2,9 +2,10 @@
 (() => {
   const A = ['Deutsch · EAC3 5.1', 'English · TrueHD 7.1', 'English · AAC 2.0'];
   const S = ['Deutsch · SRT', 'English · SRT', 'English · SDH', 'Off'];
-  const st = h => ({ v: [h ? 'HEVC 2160p · HDR10' : 'H.264 1080p', 'H.264 1080p'], a: A, s: S });
+  const VERS = ['2160p', '1080p']; // 'Dune' has two versions
+  const st = (h, ver = 0, vers) => ({ v: [h ? 'HEVC 2160p · HDR10' : 'H.264 1080p', 'H.264 1080p'], a: ver ? A.slice(1) : A, s: S, ver, ...(vers ? { vers } : {}) });
   const OV = 'Short synopsis from the Jellyfin metadata. This is where the description text of the movie or series goes.';
-  const mv = (name, year, min, seen) => ({ id: 'm:' + name, type: 'movie', name, year, min, ov: OV, seen: !!seen, st: st(year > 2010) });
+  const mv = (name, year, min, seen) => ({ id: 'm:' + name, type: 'movie', name, year, min, ov: OV, seen: !!seen, st: st(year > 2010, 0, name === 'Dune' ? VERS : undefined) });
   const sr = (name, year, seasons) => ({
     id: 's:' + name, type: 'series', name, year, ov: OV, seen: false,
     seasons: seasons.map(([n, min, seen], a) => ({
@@ -29,7 +30,7 @@
     search: q => LIBS.flatMap(l => l.items).filter(x => x.name.toLowerCase().includes(q.toLowerCase()))
       .map(({ id, name, year, type, seen }) => ({ id, name, year, type, seen })),
     detail: id => LIBS.flatMap(l => l.items).find(x => x.id === id),
-    tracks: () => st(true), // episodes come without tracks, like from the real backend
+    tracks: (id, ver) => st(true, ver, id === 'm:Dune' ? VERS : undefined), // episodes come without tracks, like from the real backend
     play: (id, v, a, s) => ({ cmd: `mpv --vid=${v + 1} --aid=${a + 1} --sid=${s + 1} <stream-url>` }),
   };
   window.MOCK = Object.fromEntries(Object.entries(impl).map(([k, f]) => [k, async (...a) => ({ ok: true, data: f(...a) })]));

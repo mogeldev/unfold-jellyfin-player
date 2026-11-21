@@ -10,7 +10,7 @@ Principle: **the player only shows the library. mpv does the playing.** No video
 | 2 | Library contents, alphabetical |
 | 3 | Poster, title, year, runtime, description |
 | 4 | Episodes by season with ✓/○ (series only) |
-| 5 | Video / audio / subtitle track, ▶ Play at the bottom |
+| 5 | Version (only if the title has several, e.g. 2160p and 1080p), video / audio / subtitle track, ▶ Play at the bottom |
 
 At start only column 1 is shown; column 2 appears after clicking a library, the others after clicking an entry. Widths adapt to the content automatically (capped); dragging sets a fixed width, double-clicking the handle makes it automatic again. The window width follows the visible columns (`win::fit_width`), the height stays as it is. Themes: terminal, nord, blueprint.
 
@@ -71,6 +71,8 @@ web/  ──window.WEBAPI──►  web/webapi.js  (the API of src/main.rs in JS
 | Start | `POST /Items/{id}/PlaybackInfo` → `PlaySessionId` |
 | Stream | `/Videos/{id}/stream?static=true&MediaSourceId&PlaySessionId&api_key` |
 | Report | `POST /Sessions/Playing`, `/Playing/Progress` (every ~10 s), `/Playing/Stopped` with `PositionTicks`, `RunTimeTicks`, `PlaySessionId` |
+
+Versions: a title with several files has several `MediaSources`; `st.vers` (names) and `st.ver` (index) come with the tracks, `tracks(id, ver)` loads the tracks of another version and `play(…, colors, ver)` streams that `MediaSourceId` (also for its external subtitles). The Android `webapi.js` does the same.
 
 "Watched" is set by the server from the Stopped report; afterwards the frontend reloads (`onPlaybackEnded`). Resume: `UserData.PlaybackPositionTicks` → `mpv --start`.
 
